@@ -1,0 +1,8 @@
+services:
+  postermaker:
+    build: .
+    image: postermaker:latest
+    container_name: postermaker
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

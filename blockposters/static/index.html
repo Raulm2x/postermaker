@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Block Posters Local · Pósteres imprimibles</title>
+  <meta name="description" content="Convierte una imagen en un póster imprimible dividido en hojas Carta, A4, Oficio o Tabloide.">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Block Posters Local, inicio">
+        <span class="brand-mark" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </span>
+        <span class="brand-text">
+          <strong>Block Posters</strong>
+          <small>local</small>
+        </span>
+      </a>
+      <p class="header-note">Imprime en casa. Sin cuentas, sin marca de agua.</p>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">Póster en cuadrícula</p>
+        <h1>Tu imagen,<br><em>en tamaño mural.</em></h1>
+        <p class="lead">
+          Elige una foto, decide cuántas hojas de ancho quieres y descarga un PDF
+          listo para imprimir. Cada página es una pieza del póster.
+        </p>
+      </section>
+
+      <div class="workspace">
+        <section class="preview-panel" aria-labelledby="preview-title">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">01 · Imagen</p>
+              <h2 id="preview-title">Vista previa</h2>
+            </div>
+            <button type="button" class="ghost-button" id="change-image" hidden>
+              Cambiar imagen
+            </button>
+          </div>
+
+          <div class="dropzone" id="dropzone" tabindex="0" role="button"
+               aria-label="Seleccionar una imagen JPG o PNG">
+            <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" hidden>
+            <div class="dropzone-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6">
+                <rect x="5" y="8" width="38" height="32" rx="4"/>
+                <circle cx="17" cy="19" r="4"/>
+                <path d="M8 34l10-9 7 6 6-5 9 8"/>
+              </svg>
+            </div>
+            <p class="dropzone-title">Arrastra tu imagen aquí</p>
+            <p class="dropzone-copy">o haz clic para elegir un archivo</p>
+            <span class="dropzone-meta">JPG, PNG o WebP · máx. 25 MB</span>
+          </div>
+
+          <div class="preview-stage" id="preview-stage" hidden>
+            <div class="canvas-wrap" id="canvas-wrap">
+              <canvas id="preview-canvas" aria-label="Vista previa del póster con guías de corte"></canvas>
+            </div>
+            <div class="preview-meta">
+              <span id="image-meta">—</span>
+              <span id="hover-tile-info" class="hover-tile-info" hidden></span>
+              <span class="cut-legend"><i aria-hidden="true"></i> guías de corte</span>
+            </div>
+          </div>
+
+          <p class="fine-print">
+            La vista previa es orientativa. La imagen no se recorta ni se deforma:
+            si la última fila no se llena, sobra papel en blanco que puedes recortar.
+          </p>
+        </section>
+
+        <aside class="options-panel" aria-labelledby="options-title">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">02 · Ajustes</p>
+              <h2 id="options-title">Configura el póster</h2>
+            </div>
+          </div>
+
+          <form id="options-form" novalidate>
+            <div class="control">
+              <div class="control-head">
+                <label for="dim-count">Tamaño del póster</label>
+                <output id="pages-wide-out" for="dim-count">3 hojas de ancho</output>
+              </div>
+              <div class="segmented segmented-tight" style="margin-bottom: 8px;">
+                <input type="radio" name="dimension_mode" id="dim-mode-wide" value="wide" checked>
+                <label for="dim-mode-wide">Definir ancho</label>
+                <input type="radio" name="dimension_mode" id="dim-mode-high" value="high">
+                <label for="dim-mode-high">Definir alto</label>
+              </div>
+              <div class="select-wrap">
+                <select id="pages-wide" name="pages_wide">
+                  <option value="1">1 hoja</option>
+                  <option value="2">2 hojas</option>
+                  <option value="3" selected>3 hojas</option>
+                  <option value="4">4 hojas</option>
+                  <option value="5">5 hojas</option>
+                  <option value="6">6 hojas</option>
+                  <option value="7">7 hojas</option>
+                  <option value="8">8 hojas</option>
+                  <option value="9">9 hojas</option>
+                  <option value="10">10 hojas</option>
+                </select>
+                <svg class="chevron" viewBox="0 0 12 8" aria-hidden="true">
+                  <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                </svg>
+              </div>
+              <p class="hint" id="dim-hint">El alto se calcula automáticamente para conservar la proporción.</p>
+            </div>
+
+            <div class="control-grid">
+              <fieldset class="control">
+                <legend>Orientación</legend>
+                <div class="segmented">
+                  <input type="radio" name="orientation" id="orientation-portrait" value="portrait" checked>
+                  <label for="orientation-portrait">
+                    <svg viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2"/></svg>
+                    Vertical
+                  </label>
+                  <input type="radio" name="orientation" id="orientation-landscape" value="landscape">
+                  <label for="orientation-landscape">
+                    <svg viewBox="0 0 20 16" aria-hidden="true"><rect x="1" y="1" width="18" height="14" rx="2"/></svg>
+                    Horizontal
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="control">
+                <div class="control-head">
+                  <label for="paper">Papel</label>
+                </div>
+                <div class="select-wrap">
+                  <select id="paper" name="paper">
+                    <option value="letter" selected>Carta (216 × 279 mm)</option>
+                    <option value="a4">A4 (210 × 297 mm)</option>
+                    <option value="a3">A3 (297 × 420 mm)</option>
+                    <option value="a5">A5 (148 × 210 mm)</option>
+                    <option value="legal">Oficio / Legal (216 × 356 mm)</option>
+                    <option value="tabloid">Tabloide / Doble Carta (279 × 432 mm)</option>
+                  </select>
+                  <svg class="chevron" viewBox="0 0 12 8" aria-hidden="true">
+                    <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="control">
+              <div class="control-head">
+                <label>Modo de color</label>
+              </div>
+              <div class="segmented">
+                <input type="radio" name="color_mode" id="color-full" value="color" checked>
+                <label for="color-full">Color</label>
+                <input type="radio" name="color_mode" id="color-gray" value="grayscale">
+                <label for="color-gray">Blanco y negro</label>
+                <input type="radio" name="color_mode" id="color-mono" value="monochrome">
+                <label for="color-mono">Alto contraste</label>
+              </div>
+              <p class="hint">Blanco y negro o alto contraste ahorra tinta de color o tóner en impresoras láser.</p>
+            </div>
+
+            <div class="control">
+              <div class="control-head">
+                <label for="margin">Margen de impresión</label>
+                <output id="margin-out" for="margin">10 mm</output>
+              </div>
+              <input type="range" id="margin" name="margin" min="0" max="20" step="1" value="10">
+              <p class="hint">Borde blanco por hoja que recortarás después. Usa la calibración si tu impresora no imprime hasta el borde.</p>
+            </div>
+
+            <div class="control">
+              <div class="control-head">
+                <label for="overlap">Solapamiento</label>
+                <output id="overlap-out" for="overlap">0 mm</output>
+              </div>
+              <input type="range" id="overlap" name="overlap" min="0" max="10" step="1" value="0">
+              <p class="hint">Amplía cada pieza hacia la vecina para pegar sin costuras.</p>
+            </div>
+
+            <div class="control">
+              <div class="control-head">
+                <label for="dpi">Resolución</label>
+              </div>
+              <div class="select-wrap">
+                <select id="dpi" name="dpi">
+                  <option value="150">150 ppp · borrador</option>
+                  <option value="300" selected>300 ppp · recomendado</option>
+                  <option value="600">600 ppp · máxima calidad</option>
+                </select>
+                <svg class="chevron" viewBox="0 0 12 8" aria-hidden="true">
+                  <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                </svg>
+              </div>
+            </div>
+
+            <div class="switch-row">
+              <label class="switch">
+                <input type="checkbox" id="marks" name="marks">
+                <span class="switch-track" aria-hidden="true"></span>
+                <span>Marcas de corte</span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" id="labels" name="labels">
+                <span class="switch-track" aria-hidden="true"></span>
+                <span>Numerar hojas</span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" id="guide" name="guide" checked>
+                <span class="switch-track" aria-hidden="true"></span>
+                <span>Plano de montaje</span>
+              </label>
+            </div>
+
+            <div class="summary" id="summary">
+              <div class="summary-top">
+                <span>Tamaño final</span>
+                <span class="dpi-badge" id="dpi-badge" hidden>—</span>
+              </div>
+              <p class="dimensions" id="dimensions">—</p>
+              <p class="summary-detail" id="summary-detail">Elige una imagen para empezar.</p>
+              <p class="resolution-note" id="resolution-note" hidden></p>
+            </div>
+
+            <button type="submit" class="primary-button" id="generate" disabled>
+              <span class="button-label">Crear PDF</span>
+              <span class="spinner" aria-hidden="true"></span>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </button>
+
+            <p class="status" id="status" role="status" aria-live="polite" hidden></p>
+
+            <div class="result-card" id="result-card" hidden>
+              <div class="result-head">
+                <span class="check" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                </span>
+                <div>
+                  <strong>Tu PDF está listo</strong>
+                  <span id="result-detail">—</span>
+                </div>
+              </div>
+              <a class="download-button" id="download-link" href="#" download>
+                <span class="download-label">Descargar PDF</span>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M10 3v10M5.5 9l4.5 4.5L14.5 9M4 17h12" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+              </a>
+              <a class="download-button secondary" id="download-zip-link" href="#" download>
+                <span class="download-zip-label">Descargar piezas sueltas (ZIP)</span>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zm6 3v8m-3-4l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+              </a>
+              <div class="result-actions">
+                <a id="result-preview" href="#" target="_blank" rel="noopener">Ver vista previa</a>
+                <button type="button" id="new-poster">Crear otro</button>
+              </div>
+            </div>
+
+            <details class="calibration">
+              <summary>¿Qué margen debo usar?</summary>
+              <p>
+                Imprime la hoja de calibración al 100 %, mide el borde blanco de
+                tu impresora e introduce el valor mayor. Si imprime sin bordes,
+                usa 0 mm.
+              </p>
+              <a id="calibration-link" href="/api/calibration?paper=letter" download>
+                Descargar calibración Carta
+              </a>
+            </details>
+          </form>
+        </aside>
+      </div>
+
+      <section class="steps" aria-label="Cómo funciona">
+        <article>
+          <span>01</span>
+          <h3>Elige y ajusta</h3>
+          <p>Sube una foto y define el ancho, el papel y los márgenes.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Descarga el PDF</h3>
+          <p>Obtienes una página por pieza, en orden de lectura.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Imprime y une</h3>
+          <p>Imprime al 100 %, recorta los bordes y pega las hojas.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-info">
+        <p>Block Posters Local · todo se procesa en tu equipo de forma privada.</p>
+        <p class="footer-hint">El servidor se apaga automáticamente tras un periodo de inactividad para ahorrar memoria.</p>
+      </div>
+      <button type="button" id="btn-shutdown" class="btn-subtle" title="Cerrar servidor y liberar memoria RAM inmediatamente">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M8 2v5M4.5 4.5a5.5 5.5 0 1 0 7 0"/>
+        </svg>
+        Liberar memoria y salir
+      </button>
+    </footer>
+  </div>
+</body>
+</html>
