@@ -10,6 +10,20 @@
   <script src="/static/app.js" defer></script>
 </head>
 <body>
+  <div id="updater-overlay" class="updater-overlay" aria-live="polite">
+    <div class="updater-card">
+      <div class="updater-mark">
+        <i></i><i></i><i></i><i></i>
+      </div>
+      <h2 id="updater-title">Iniciando PosterMaker</h2>
+      <p id="updater-desc">Comprobando cambios en el repositorio...</p>
+      <div class="updater-progress">
+        <div id="updater-progress-bar" class="updater-progress-bar"></div>
+      </div>
+      <span id="updater-status" class="updater-status">Conectando...</span>
+    </div>
+  </div>
+
   <div class="page">
     <header class="site-header">
       <a class="brand" href="/" aria-label="PosterMaker, inicio">
@@ -306,7 +320,7 @@
 
     <footer class="site-footer">
       <div class="footer-info">
-        <p>PosterMaker · todo se procesa en tu equipo de forma privada.</p>
+        <p>PosterMaker · todo se procesa en tu equipo de forma privada. <span class="version-badge">v1.0.0</span> · <button type="button" id="btn-check-update" class="btn-text">Buscar actualizaciones</button></p>
         <p class="footer-hint">El servidor se apaga automáticamente tras un periodo de inactividad para ahorrar memoria.</p>
       </div>
       <button type="button" id="btn-shutdown" class="btn-subtle" title="Cerrar servidor y liberar memoria RAM inmediatamente">

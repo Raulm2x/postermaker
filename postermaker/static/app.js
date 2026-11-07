@@ -784,6 +784,98 @@ if (shutdownBtn) {
   });
 }
 
+// ---------- Gestión de actualización automática ----------
+const updaterUi = {
+  overlay: document.getElementById("updater-overlay"),
+  title: document.getElementById("updater-title"),
+  desc: document.getElementById("updater-desc"),
+  status: document.getElementById("updater-status"),
+  btnCheck: document.getElementById("btn-check-update"),
+};
+
+async function handleStartupUpdateCheck() {
+  if (!updaterUi.overlay) return;
+
+  const hideOverlay = (delay = 350) => {
+    setTimeout(() => {
+      updaterUi.overlay.classList.add("is-hidden");
+    }, delay);
+  };
+
+  try {
+    const res = await fetch("/api/update/status");
+    if (!res.ok) throw new Error("Status failed");
+    const state = await res.json();
+
+    if (state.status === "updating") {
+      updaterUi.title.textContent = "Actualizando PosterMaker...";
+      updaterUi.desc.textContent = state.message || "Descargando e integrando cambios del repositorio...";
+      updaterUi.status.textContent = "Aplicando actualización...";
+
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const pollRes = await fetch("/api/update/status");
+          const pollState = await pollRes.json();
+          if (pollState.status === "updated") {
+            clearInterval(poll);
+            updaterUi.title.textContent = "¡Actualización completada!";
+            updaterUi.desc.textContent = "PosterMaker está listo con la última versión.";
+            updaterUi.status.textContent = "Iniciando...";
+            hideOverlay(600);
+          } else if (pollState.status === "up_to_date" || pollState.status === "error" || attempts > 15) {
+            clearInterval(poll);
+            hideOverlay(250);
+          }
+        } catch (_) {
+          clearInterval(poll);
+          hideOverlay(250);
+        }
+      }, 700);
+      return;
+    } else if (state.status === "updated") {
+      updaterUi.title.textContent = "¡PosterMaker actualizado!";
+      updaterUi.desc.textContent = state.message;
+      updaterUi.status.textContent = "Listo para usar.";
+      hideOverlay(500);
+      return;
+    }
+
+    hideOverlay(250);
+  } catch (e) {
+    hideOverlay(150);
+  }
+}
+
+if (updaterUi.btnCheck) {
+  updaterUi.btnCheck.addEventListener("click", async () => {
+    updaterUi.btnCheck.disabled = true;
+    updaterUi.btnCheck.textContent = "Buscando...";
+    try {
+      const res = await fetch("/api/update/check", { method: "POST" });
+      const data = await res.json();
+      if (data.status === "updated") {
+        alert("¡PosterMaker se ha actualizado correctamente! Recarga la página para ver las novedades.");
+        window.location.reload();
+      } else if (data.status === "up_to_date") {
+        alert(data.message || "PosterMaker ya está en la última versión.");
+      } else if (data.status === "available") {
+        alert(`Nueva versión disponible: ${data.latest_version}.`);
+      } else {
+        alert(data.message || "Comprobación completada.");
+      }
+    } catch (e) {
+      alert("No se pudo conectar con el repositorio. Comprueba tu conexión a internet.");
+    } finally {
+      updaterUi.btnCheck.disabled = false;
+      updaterUi.btnCheck.textContent = "Buscar actualizaciones";
+    }
+  });
+}
+
+handleStartupUpdateCheck();
+
 /* ---------- Inicio ---------- */
 
 updateAll();

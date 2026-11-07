@@ -176,3 +176,18 @@ def test_inactivity_and_lifecycle_endpoints(client, monkeypatch: pytest.MonkeyPa
     sd_resp = client.post("/api/shutdown")
     assert sd_resp.status_code == 200
     assert sd_resp.get_json()["ok"] is True
+
+
+def test_updater_endpoints(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    # 1. Estado inicial de actualización
+    st_resp = client.get("/api/update/status")
+    assert st_resp.status_code == 200
+    data = st_resp.get_json()
+    assert "status" in data
+    assert "current_version" in data
+
+    # 2. Comprobación mockeada
+    monkeypatch.setattr(web.updater, "check_and_update", lambda: {"status": "up_to_date", "message": "Al día"})
+    chk_resp = client.post("/api/update/check")
+    assert chk_resp.status_code == 200
+    assert chk_resp.get_json()["status"] == "up_to_date"

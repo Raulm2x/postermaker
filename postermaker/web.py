@@ -34,6 +34,7 @@ from .calibration import calibration_pdf
 from .image import ImageError
 from .paper import PAPERS, Margins
 from .pipeline import generate_poster
+from .updater import updater
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
     for cand in (
@@ -270,6 +271,17 @@ def api_shutdown():
 
     threading.Thread(target=_do_shutdown, daemon=True).start()
     return jsonify(ok=True, message="Servidor apagado y recursos liberados con éxito.")
+
+
+@app.get("/api/update/status")
+def update_status():
+    return jsonify(updater.get_state())
+
+
+@app.post("/api/update/check")
+def update_check():
+    result = updater.check_and_update()
+    return jsonify(result)
 
 
 @app.get("/api/calibration")
@@ -530,12 +542,20 @@ def main(argv: list[str] | None = None) -> int:
         default=900,
         help="Segundos de inactividad antes de liberar memoria y cerrar el servidor (por defecto 900s / 15m; 0 para desactivar).",
     )
+    parser.add_argument(
+        "--no-update",
+        action="store_true",
+        help="Desactivar la comprobación automática de actualizaciones al iniciar.",
+    )
     args = parser.parse_args(argv)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     inactivity_manager.timeout = args.idle_timeout
     inactivity_manager.start()
+
+    if not args.no_update:
+        threading.Thread(target=updater.check_and_update, daemon=True).start()
 
     target_port = args.port
 

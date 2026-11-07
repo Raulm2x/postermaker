@@ -51,6 +51,7 @@ mkdir -p "$BIN_DIR" "$APPS_DIR" "$ICONS_DIR" "$PIXMAPS_DIR"
 DEST_BIN="$BIN_DIR/postermaker"
 ALIAS_BIN="$BIN_DIR/blockposters"
 if [ -n "$SRC_BIN" ]; then
+    rm -f "$DEST_BIN" 2>/dev/null || true
     cp -f "$SRC_BIN" "$DEST_BIN"
     chmod 755 "$DEST_BIN"
     echo "-> Binario instalado en: $DEST_BIN"

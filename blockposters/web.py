@@ -34,17 +34,26 @@ from .calibration import calibration_pdf
 from .image import ImageError
 from .paper import PAPERS, Margins
 from .pipeline import generate_poster
+from .updater import updater
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    candidate = Path(sys._MEIPASS) / "blockposters"
-    BASE_DIR = candidate if candidate.is_dir() else Path(sys._MEIPASS)
+    for cand in (
+        Path(sys._MEIPASS) / "postermaker",
+        Path(sys._MEIPASS) / "blockposters",
+    ):
+        if cand.is_dir():
+            BASE_DIR = cand
+            break
+    else:
+        BASE_DIR = Path(sys._MEIPASS)
 else:
     BASE_DIR = Path(__file__).resolve().parent
 
 STATIC_DIR = BASE_DIR / "static"
 OUTPUT_DIR = Path(
     os.environ.get(
-        "BLOCKPOSTERS_OUTPUT", str(Path(tempfile.gettempdir()) / "blockposters")
+        "POSTERMAKER_OUTPUT",
+        os.environ.get("BLOCKPOSTERS_OUTPUT", str(Path(tempfile.gettempdir()) / "postermaker")),
     )
 )
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -264,6 +273,17 @@ def api_shutdown():
     return jsonify(ok=True, message="Servidor apagado y recursos liberados con éxito.")
 
 
+@app.get("/api/update/status")
+def update_status():
+    return jsonify(updater.get_state())
+
+
+@app.post("/api/update/check")
+def update_check():
+    result = updater.check_and_update()
+    return jsonify(result)
+
+
 @app.get("/api/calibration")
 def calibration():
     paper = str(request.args.get("paper", "letter")).strip().lower()
@@ -400,7 +420,7 @@ def download_zip(job_id: str):
             for p in sorted(tiles_dir.glob("*.jpg")):
                 zf.write(p, arcname=p.name)
             readme = (
-                f"Block Posters Local - Piezas individuales del póster\n"
+                f"PosterMaker Local - Piezas individuales del póster\n"
                 f"Cuadrícula: {meta.get('pages_wide', '?')} x {meta.get('pages_high', '?')} hojas\n"
                 f"Papel: {meta.get('paper', '?')} ({meta.get('orientation', '?')})\n\n"
                 f"Instrucciones de impresión:\n"
@@ -472,7 +492,7 @@ def _open_in_browser(url: str) -> None:
     if shutil.which("notify-send"):
         try:
             subprocess.Popen(
-                ["notify-send", "-a", "Block Posters", "Block Posters", f"Abriendo en {url}"],
+                ["notify-send", "-a", "PosterMaker", "PosterMaker", f"Abriendo en {url}"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
@@ -505,7 +525,7 @@ def _open_in_browser(url: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="blockposters-web",
+        prog="postermaker-web",
         description="Servidor local para crear pósteres imprimibles.",
     )
     parser.add_argument("--host", default="127.0.0.1")
@@ -522,6 +542,11 @@ def main(argv: list[str] | None = None) -> int:
         default=900,
         help="Segundos de inactividad antes de liberar memoria y cerrar el servidor (por defecto 900s / 15m; 0 para desactivar).",
     )
+    parser.add_argument(
+        "--no-update",
+        action="store_true",
+        help="Desactivar la comprobación automática de actualizaciones al iniciar.",
+    )
     args = parser.parse_args(argv)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -529,12 +554,15 @@ def main(argv: list[str] | None = None) -> int:
     inactivity_manager.timeout = args.idle_timeout
     inactivity_manager.start()
 
+    if not args.no_update:
+        threading.Thread(target=updater.check_and_update, daemon=True).start()
+
     target_port = args.port
 
-    # Si ya hay una instancia de Block Posters activa en el puerto:
+    # Si ya hay una instancia de PosterMaker activa en el puerto:
     if _is_blockposters_running(args.host, target_port):
         url = f"http://{args.host}:{target_port}"
-        print(f"Block Posters ya está en ejecución en: {url}")
+        print(f"PosterMaker ya está en ejecución en: {url}")
         if args.open:
             _open_in_browser(url)
         return 0
@@ -546,7 +574,7 @@ def main(argv: list[str] | None = None) -> int:
         target_port = free_port
 
     url = f"http://{args.host}:{target_port}"
-    print(f"Block Posters local: {url}")
+    print(f"PosterMaker local: {url}")
 
     if args.open:
         import threading

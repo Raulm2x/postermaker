@@ -97,6 +97,11 @@ def install_desktop() -> int:
     if getattr(sys, "frozen", False):
         current_exe = Path(sys.executable).resolve()
         if current_exe != dest_bin.resolve():
+            if dest_bin.is_file() or dest_bin.is_symlink():
+                try:
+                    dest_bin.unlink()
+                except OSError:
+                    pass
             shutil.copy2(current_exe, dest_bin)
     else:
         # Wrapper bash para ejecutar el módulo de Python actual
