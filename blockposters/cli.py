@@ -20,11 +20,21 @@ def _parser() -> argparse.ArgumentParser:
             "PosterMaker: Convierte una imagen en un póster imprimible dividido en varias hojas."
         ),
     )
-    parser.add_argument("image", nargs="?", help="Imagen de entrada (JPG, PNG o WebP).")
+    parser.add_argument(
+        "images",
+        nargs="*",
+        metavar="IMAGEN",
+        help="Una o varias imágenes de entrada (JPG, PNG o WebP).",
+    )
     parser.add_argument(
         "-o",
         "--output",
-        help="PDF de salida (por defecto poster_AAAAMMDD_HHMMSS.pdf).",
+        help="PDF de salida (por defecto poster_AAAAMMDD_HHMMSS.pdf o archivo unificado).",
+    )
+    parser.add_argument(
+        "--separate",
+        action="store_true",
+        help="Al procesar varias imágenes, genera cada póster como un archivo PDF separado.",
     )
     parser.add_argument(
         "--pages-wide",
@@ -178,9 +188,67 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Hoja de calibración: {output.resolve()} ({_human_size(output.stat().st_size)})")
         return 0
 
-    if not args.image:
-        parser.error("indica una imagen o usa --calibration")
+    if not args.images:
+        parser.error("indica al menos una imagen o usa --calibration")
 
+    # Múltiples imágenes (procesamiento por lotes)
+    if len(args.images) > 1:
+        import time
+        if not args.output:
+            if args.separate:
+                output = Path(".")
+            else:
+                output = Path(f"posters_lote_{len(args.images)}_imagenes_{time.strftime('%Y%m%d_%H%M%S')}.pdf")
+        else:
+            output = Path(args.output)
+
+        pages_wide = args.pages_wide
+        pages_high = args.pages_high
+        if pages_wide is None and pages_high is None:
+            pages_wide = 3
+
+        tiles = Path(args.tiles) if args.tiles else None
+
+        try:
+            from .pipeline import generate_posters_batch
+
+            batch_res = generate_posters_batch(
+                args.images,
+                output,
+                separate=args.separate,
+                pages_wide=pages_wide,
+                pages_high=pages_high,
+                paper=args.paper,
+                orientation=args.orientation,
+                margins=_margins(args),
+                dpi=args.dpi,
+                overlap_mm=args.overlap,
+                marks=args.marks,
+                labels=args.labels,
+                color_mode=args.color,
+                assembly_guide=args.guide,
+                tiles_base_dir=tiles,
+            )
+
+            if args.separate:
+                print(f"Lote procesado: {len(batch_res.items)} pósteres generados por separado ({batch_res.total_pages} páginas totales).")
+                if output.suffix.lower() == ".zip":
+                    print(f"Archivo ZIP: {output.resolve()} ({_human_size(output.stat().st_size)})")
+                else:
+                    for it in batch_res.items:
+                        print(f"  - {it.name}: {it.pdf_path.resolve()} ({_human_size(it.pdf_path.stat().st_size)})")
+            else:
+                print(
+                    f"Pósteres combinados: {output.resolve()} "
+                    f"({len(batch_res.items)} pósteres, {batch_res.total_pages} páginas, {_human_size(output.stat().st_size)})"
+                )
+            return 0
+        except (ValueError, OSError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+
+    # Una sola imagen (flujo unitario tradicional)
+    image_src = args.images[0]
     if not args.output:
         import time
         output = Path(f"poster_{time.strftime('%Y%m%d_%H%M%S')}.pdf")
@@ -206,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         result = generate_poster(
-            args.image,
+            image_src,
             output,
             pages_wide=pages_wide,
             pages_high=pages_high,

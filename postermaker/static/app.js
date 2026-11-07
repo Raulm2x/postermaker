@@ -21,6 +21,9 @@ const els = {
   fileInput: document.getElementById("file-input"),
   changeImage: document.getElementById("change-image"),
   previewStage: document.getElementById("preview-stage"),
+  batchBar: document.getElementById("batch-bar"),
+  batchCount: document.getElementById("batch-count"),
+  batchThumbs: document.getElementById("batch-thumbs"),
   canvas: document.getElementById("preview-canvas"),
   canvasWrap: document.getElementById("canvas-wrap"),
   imageMeta: document.getElementById("image-meta"),
@@ -39,6 +42,7 @@ const els = {
   labels: document.getElementById("labels"),
   guide: document.getElementById("guide"),
   skipGuide: document.getElementById("skip-guide"),
+  separatePosters: document.getElementById("separate-posters"),
   dimensions: document.getElementById("dimensions"),
   summaryDetail: document.getElementById("summary-detail"),
   dpiBadge: document.getElementById("dpi-badge"),
@@ -46,15 +50,21 @@ const els = {
   generate: document.getElementById("generate"),
   status: document.getElementById("status"),
   resultCard: document.getElementById("result-card"),
+  resultTitle: document.getElementById("result-title"),
   resultDetail: document.getElementById("result-detail"),
   downloadLink: document.getElementById("download-link"),
   downloadZipLink: document.getElementById("download-zip-link"),
+  batchSeparateFiles: document.getElementById("batch-separate-files"),
+  batchFilesList: document.getElementById("batch-files-list"),
   resultPreview: document.getElementById("result-preview"),
   newPoster: document.getElementById("new-poster"),
   calibrationLink: document.getElementById("calibration-link"),
 };
 
 const state = {
+  files: [],
+  items: [],
+  activeIndex: 0,
   file: null,
   image: null,
   imageUrl: null,
@@ -89,6 +99,7 @@ function readOptions() {
     labels: Boolean(els.labels && els.labels.checked),
     guide: Boolean(els.skipGuide ? !els.skipGuide.checked : (els.guide && els.guide.checked)),
     skipGuide: Boolean(els.skipGuide ? els.skipGuide.checked : (els.guide ? !els.guide.checked : true)),
+    separatePosters: Boolean(els.separatePosters && els.separatePosters.checked),
   };
 }
 
@@ -156,6 +167,8 @@ function clearResult() {
   els.resultCard.hidden = true;
   els.downloadLink.href = "#";
   if (els.downloadZipLink) els.downloadZipLink.href = "#";
+  if (els.batchSeparateFiles) els.batchSeparateFiles.hidden = true;
+  if (els.batchFilesList) els.batchFilesList.innerHTML = "";
   els.resultPreview.href = "#";
 }
 
@@ -209,11 +222,32 @@ function updateSummary(options, grid) {
     grid.posterHeight - (grid.pagesHigh - 1) * grid.usableHeight;
   const partialRow = lastRowHeight < grid.usableHeight - 0.5;
   const totalPages = grid.totalPages + (options.guide ? 1 : 0);
-  els.summaryDetail.textContent =
-    `${grid.pagesWide} × ${grid.pagesHigh} hojas · ` +
-    `${totalPages} página${totalPages === 1 ? "" : "s"} · ` +
-    `${(PAPERS[options.paper] || PAPERS.letter).name} ${orientationText}` +
-    (partialRow ? " · última fila parcial" : "");
+
+  if (state.items && state.items.length > 1) {
+    const isSep = options.separatePosters;
+    const modeText = isSep ? "pósteres por separado" : "1 PDF combinado";
+    els.summaryDetail.textContent =
+      `${state.items.length} imágenes cargadas (${modeText}) · ` +
+      `activa: ${grid.pagesWide} × ${grid.pagesHigh} hojas · ` +
+      `${totalPages} pág${totalPages === 1 ? "" : "s"}` +
+      (partialRow ? " · fila parcial" : "");
+
+    if (!state.generating) {
+      els.generate.querySelector(".button-label").textContent = isSep
+        ? `Crear ${state.items.length} pósteres por separado`
+        : `Crear PDF combinado (${state.items.length} pósteres)`;
+    }
+  } else {
+    els.summaryDetail.textContent =
+      `${grid.pagesWide} × ${grid.pagesHigh} hojas · ` +
+      `${totalPages} página${totalPages === 1 ? "" : "s"} · ` +
+      `${(PAPERS[options.paper] || PAPERS.letter).name} ${orientationText}` +
+      (partialRow ? " · última fila parcial" : "");
+
+    if (!state.generating) {
+      els.generate.querySelector(".button-label").textContent = "Crear PDF";
+    }
+  }
 
   const dpi = grid.effectiveDpi;
   els.dpiBadge.hidden = false;
@@ -398,7 +432,11 @@ function updateImageMeta() {
   const name = state.file.name;
   const width = state.image.naturalWidth;
   const height = state.image.naturalHeight;
-  els.imageMeta.textContent = `${name} · ${width} × ${height} px`;
+  if (state.items && state.items.length > 1) {
+    els.imageMeta.textContent = `[${state.activeIndex + 1}/${state.items.length}] ${name} · ${width} × ${height} px`;
+  } else {
+    els.imageMeta.textContent = `${name} · ${width} × ${height} px`;
+  }
 }
 
 function updateAll() {
@@ -412,10 +450,55 @@ function updateAll() {
   }
 }
 
+function selectActiveImage(index) {
+  if (!state.items || !state.items[index]) return;
+  state.activeIndex = index;
+  state.file = state.items[index].file;
+  state.image = state.items[index].image;
+  state.imageUrl = state.items[index].objectUrl;
+  state.invalid = false;
+
+  if (els.batchThumbs) {
+    const thumbs = els.batchThumbs.querySelectorAll(".batch-thumb-item");
+    thumbs.forEach((el, i) => el.classList.toggle("is-active", i === index));
+  }
+  updateAll();
+}
+
+function renderBatchThumbs() {
+  if (!els.batchBar || !els.batchThumbs) return;
+  if (!state.items || state.items.length <= 1) {
+    els.batchBar.hidden = true;
+    return;
+  }
+
+  els.batchBar.hidden = false;
+  if (els.batchCount) els.batchCount.textContent = `${state.items.length} imágenes`;
+  els.batchThumbs.innerHTML = "";
+
+  state.items.forEach((item, idx) => {
+    const thumb = document.createElement("button");
+    thumb.type = "button";
+    thumb.className = `batch-thumb-item ${idx === state.activeIndex ? "is-active" : ""}`;
+    thumb.title = `${idx + 1}. ${item.file.name}`;
+    thumb.innerHTML = `
+      <span class="batch-thumb-num">${idx + 1}</span>
+      <img src="${item.objectUrl}" alt="${item.file.name}" />
+    `;
+    thumb.addEventListener("click", () => {
+      selectActiveImage(idx);
+    });
+    els.batchThumbs.appendChild(thumb);
+  });
+}
+
 function showImage(file, image, objectUrl) {
   if (state.imageUrl) {
     URL.revokeObjectURL(state.imageUrl);
   }
+  state.files = [file];
+  state.items = [{ file, image, objectUrl }];
+  state.activeIndex = 0;
   state.file = file;
   state.image = image;
   state.imageUrl = objectUrl;
@@ -423,6 +506,7 @@ function showImage(file, image, objectUrl) {
 
   els.dropzone.hidden = true;
   els.previewStage.hidden = false;
+  if (els.batchBar) els.batchBar.hidden = true;
   els.changeImage.hidden = false;
   clearResult();
   setStatus("");
@@ -430,9 +514,17 @@ function showImage(file, image, objectUrl) {
 }
 
 function resetPoster() {
+  if (state.items) {
+    for (const item of state.items) {
+      if (item && item.objectUrl) URL.revokeObjectURL(item.objectUrl);
+    }
+  }
   if (state.imageUrl) {
     URL.revokeObjectURL(state.imageUrl);
   }
+  state.files = [];
+  state.items = [];
+  state.activeIndex = 0;
   state.file = null;
   state.image = null;
   state.imageUrl = null;
@@ -442,6 +534,8 @@ function resetPoster() {
   els.fileInput.value = "";
   els.dropzone.hidden = false;
   els.previewStage.hidden = true;
+  if (els.batchBar) els.batchBar.hidden = true;
+  if (els.batchThumbs) els.batchThumbs.innerHTML = "";
   els.changeImage.hidden = true;
   els.generate.classList.remove("loading");
   els.generate.removeAttribute("aria-busy");
@@ -451,40 +545,84 @@ function resetPoster() {
   updateAll();
 }
 
-function loadFile(file) {
-  if (!file) return;
+function loadFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const files = Array.from(fileList);
 
-  const isImage =
-    ["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-    /\.(jpe?g|png|webp)$/i.test(file.name);
-
-  if (!isImage) {
-    setStatus("Formato no compatible. Usa un archivo JPG, PNG o WebP.", "error");
-    return;
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    setStatus("La imagen supera el límite de 25 MB.", "error");
-    return;
-  }
-
-  const objectUrl = URL.createObjectURL(file);
-  const image = new Image();
-
-  image.onload = () => {
-    if (!image.naturalWidth || !image.naturalHeight) {
-      URL.revokeObjectURL(objectUrl);
-      setStatus("No se pudo leer la imagen. Prueba con otro archivo.", "error");
-      return;
+  const validFiles = [];
+  for (const file of files) {
+    const isImage =
+      ["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+      /\.(jpe?g|png|webp)$/i.test(file.name);
+    if (!isImage) {
+      setStatus(`El archivo "${file.name}" no es compatible. Usa JPG, PNG o WebP.`, "error");
+      continue;
     }
-    showImage(file, image, objectUrl);
-  };
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setStatus(`El archivo "${file.name}" supera el límite de 25 MB.`, "error");
+      continue;
+    }
+    validFiles.push(file);
+  }
 
-  image.onerror = () => {
-    URL.revokeObjectURL(objectUrl);
-    setStatus("No se pudo leer la imagen. Prueba con otro archivo.", "error");
-  };
+  if (!validFiles.length) return;
 
-  image.src = objectUrl;
+  if (state.items) {
+    for (const item of state.items) {
+      if (item && item.objectUrl) URL.revokeObjectURL(item.objectUrl);
+    }
+  }
+  if (state.imageUrl) {
+    URL.revokeObjectURL(state.imageUrl);
+  }
+  state.items = new Array(validFiles.length);
+  state.files = validFiles;
+
+  let loadedCount = 0;
+  const total = validFiles.length;
+
+  validFiles.forEach((file, index) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      state.items[index] = { file, image: img, objectUrl };
+      loadedCount += 1;
+      if (loadedCount === total) {
+        onAllImagesLoaded();
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      loadedCount += 1;
+      if (loadedCount === total) {
+        onAllImagesLoaded();
+      }
+    };
+    img.src = objectUrl;
+  });
+}
+
+function onAllImagesLoaded() {
+  state.items = state.items.filter(Boolean);
+  if (!state.items.length) {
+    setStatus("No se pudieron cargar las imágenes seleccionadas.", "error");
+    return;
+  }
+  state.files = state.items.map((it) => it.file);
+  selectActiveImage(0);
+
+  els.dropzone.hidden = true;
+  els.previewStage.hidden = false;
+  els.changeImage.hidden = false;
+
+  renderBatchThumbs();
+  clearResult();
+  setStatus("");
+  updateAll();
+}
+
+function loadFile(file) {
+  if (file) loadFiles([file]);
 }
 
 function formatBytes(bytes) {
@@ -518,20 +656,71 @@ function showResult(data) {
   clearResult();
 
   const size = formatBytes(data.sizeBytes);
-  els.resultDetail.textContent =
-    `${data.pagesWide} × ${data.pagesHigh} hojas · ` +
-    `${decimal.format(data.widthCm)} × ${decimal.format(data.heightCm)} cm` +
-    (size ? ` · ${size}` : "");
+  if (data.isBatch) {
+    if (data.separate) {
+      if (els.resultTitle) els.resultTitle.textContent = "Tus pósteres están listos";
+      els.resultDetail.textContent =
+        `${data.posterCount} pósteres generados por separado · ${data.totalPages} páginas totales` +
+        (size ? ` · ZIP ${size}` : "");
 
-  els.downloadLink.href = data.downloadUrl;
-  els.downloadLink.setAttribute("download", data.filename || "poster.pdf");
-  els.downloadLink.querySelector(".download-label").textContent = size
-    ? `Descargar PDF (${size})`
-    : "Descargar PDF";
+      els.downloadLink.href = data.downloadUrl;
+      els.downloadLink.setAttribute("download", data.filename || "posters_separados.zip");
+      els.downloadLink.querySelector(".download-label").textContent = size
+        ? `Descargar todos los pósteres (ZIP ${size})`
+        : "Descargar pósteres (ZIP)";
+
+      if (els.batchSeparateFiles && els.batchFilesList && data.items && data.items.length) {
+        els.batchFilesList.innerHTML = "";
+        data.items.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "batch-file-row";
+          const itemSize = formatBytes(item.sizeBytes);
+          row.innerHTML = `
+            <div class="batch-file-info">
+              <span class="batch-file-name" title="${item.filename}">${item.filename}</span>
+              <span class="batch-file-meta">${item.pagesWide} × ${item.pagesHigh} hojas · ${item.totalPages} páginas${itemSize ? " · " + itemSize : ""}</span>
+            </div>
+            <a class="batch-file-btn" href="${item.downloadUrl}" download="${item.filename}">
+              Descargar PDF
+            </a>
+          `;
+          els.batchFilesList.appendChild(row);
+        });
+        els.batchSeparateFiles.hidden = false;
+      }
+    } else {
+      if (els.resultTitle) els.resultTitle.textContent = "Tu PDF combinado está listo";
+      els.resultDetail.textContent =
+        `${data.posterCount} pósteres combinados · ${data.totalPages} páginas totales` +
+        (size ? ` · ${size}` : "");
+
+      els.downloadLink.href = data.downloadUrl;
+      els.downloadLink.setAttribute("download", data.filename || "posters_combinados.pdf");
+      els.downloadLink.querySelector(".download-label").textContent = size
+        ? `Descargar PDF combinado (${size})`
+        : "Descargar PDF combinado";
+
+      if (els.batchSeparateFiles) els.batchSeparateFiles.hidden = true;
+    }
+  } else {
+    if (els.resultTitle) els.resultTitle.textContent = "Tu PDF está listo";
+    els.resultDetail.textContent =
+      `${data.pagesWide} × ${data.pagesHigh} hojas · ` +
+      `${decimal.format(data.widthCm)} × ${decimal.format(data.heightCm)} cm` +
+      (size ? ` · ${size}` : "");
+
+    els.downloadLink.href = data.downloadUrl;
+    els.downloadLink.setAttribute("download", data.filename || "poster.pdf");
+    els.downloadLink.querySelector(".download-label").textContent = size
+      ? `Descargar PDF (${size})`
+      : "Descargar PDF";
+
+    if (els.batchSeparateFiles) els.batchSeparateFiles.hidden = true;
+  }
 
   if (els.downloadZipLink) {
     els.downloadZipLink.href = data.downloadZipUrl || `/api/download/${data.id}/zip`;
-    const base = (data.filename || "poster.pdf").replace(/\.pdf$/i, "");
+    const base = (data.filename || "poster.pdf").replace(/\.(pdf|zip)$/i, "");
     els.downloadZipLink.setAttribute("download", `${base}_piezas.zip`);
   }
 
@@ -541,11 +730,14 @@ function showResult(data) {
 }
 
 async function generate() {
-  if (!state.file || state.generating || state.invalid) return;
+  const filesToUpload = (state.files && state.files.length) ? state.files : (state.file ? [state.file] : []);
+  if (!filesToUpload.length || state.generating || state.invalid) return;
 
   const options = readOptions();
   const formData = new FormData();
-  formData.append("image", state.file, state.file.name);
+  for (const f of filesToUpload) {
+    formData.append("image", f, f.name);
+  }
   formData.append("dimension_mode", options.dimMode);
   if (options.dimMode === "wide") {
     formData.append("pages_wide", String(options.dimCount));
@@ -562,9 +754,15 @@ async function generate() {
   formData.append("labels", options.labels ? "true" : "false");
   formData.append("guide", options.guide ? "true" : "false");
   formData.append("skip_guide", options.skipGuide ? "true" : "false");
+  formData.append("separate_posters", options.separatePosters ? "true" : "false");
 
   setGenerating(true);
-  setStatus("Generando el PDF. Las imágenes grandes pueden tardar unos segundos…");
+  const msg = filesToUpload.length > 1
+    ? (options.separatePosters
+        ? `Generando ${filesToUpload.length} pósteres por separado…`
+        : `Generando PDF combinado de ${filesToUpload.length} pósteres…`)
+    : "Generando el PDF. Las imágenes grandes pueden tardar unos segundos…";
+  setStatus(msg);
   clearResult();
 
   try {
@@ -617,8 +815,8 @@ els.dropzone.addEventListener("keydown", (event) => {
 });
 
 els.fileInput.addEventListener("change", () => {
-  const file = els.fileInput.files && els.fileInput.files[0];
-  if (file) loadFile(file);
+  const files = els.fileInput.files;
+  if (files && files.length) loadFiles(files);
 });
 
 els.changeImage.addEventListener("click", () => els.fileInput.click());
@@ -640,8 +838,8 @@ for (const eventName of ["dragleave", "dragend"]) {
 els.dropzone.addEventListener("drop", (event) => {
   event.preventDefault();
   els.dropzone.classList.remove("is-dragging");
-  const file = event.dataTransfer && event.dataTransfer.files[0];
-  if (file) loadFile(file);
+  const files = event.dataTransfer && event.dataTransfer.files;
+  if (files && files.length) loadFiles(files);
 });
 
 els.form.addEventListener("submit", (event) => {
@@ -664,6 +862,7 @@ for (const element of [
   els.labels,
   els.guide,
   els.skipGuide,
+  els.separatePosters,
 ]) {
   if (element) {
     element.addEventListener("input", onOptionsChanged);

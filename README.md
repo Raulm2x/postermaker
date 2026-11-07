@@ -9,6 +9,7 @@ Genera un archivo PDF con una página por pieza listo para imprimir al 100 %, re
 ## Características principales
 
 * **Cálculo automático de cuadrícula:** Define cuántas hojas de ancho o de alto deseas; la proporción se conserva sin deformar ni recortar la imagen original.
+* **Procesamiento de múltiples imágenes por lotes:** Selecciona varias imágenes a la vez. Por defecto se genera un único archivo PDF que contiene todos los pósteres generados en secuencia; también puedes activar la opción para generar cada póster por separado (descarga individual o en archivo ZIP).
 * **Formatos de papel en español e internacionales:** Carta (Letter), A4, A3, A5, Oficio (Legal) y Tabloide (Doble Carta).
 * **Plano y guía de montaje visual:** Genera opcionalmente como primera página un esquema numerado con dimensiones en cm, líneas de corte e instrucciones paso a paso.
 * **Gestor de inactividad inteligente:** El servidor web monitorea las conexiones y se apaga de forma autónoma tras un periodo de inactividad (o con un clic en la interfaz), liberando la memoria RAM y los archivos temporales.
@@ -133,8 +134,9 @@ postermaker foto.jpg \
 
 | Opción | Descripción |
 | --- | --- |
-| `image` | Ruta de la imagen de entrada (JPG, PNG o WebP). |
-| `-o, --output` | Nombre del PDF generado (por defecto: `poster.pdf`). |
+| `image` | Una o varias rutas de imágenes de entrada (JPG, PNG o WebP). |
+| `-o, --output` | Nombre del archivo de salida (PDF o ZIP). |
+| `--separate` | Al procesar varias imágenes, genera cada póster como archivo PDF separado (o en un ZIP si `-o archivo.zip`). |
 | `--pages-wide N` | Número de hojas de ancho (1 a 10). |
 | `--pages-high N` | Número de hojas de alto (1 a 10; alternativa a `--pages-wide`). |
 | `--paper PAPEL` | Tamaño de papel: `carta`, `letter`, `a4`, `a3`, `a5`, `oficio`, `legal`, `tabloide`, `tabloid`. |
@@ -147,6 +149,7 @@ postermaker foto.jpg \
 | `--marks` | Añade marcas de corte en los bordes de cada hoja. |
 | `--labels` | Añade numeración de fila y columna en el pie de página de cada hoja. |
 | `--guide` | Incluye plano de montaje e instrucciones como primera página del PDF. |
+| `--skip-guide` | Omite el plano de montaje e instrucciones (predeterminado). |
 | `--tiles DIR` | Guarda cada hoja individual como imagen JPEG en la carpeta indicada. |
 | `--zip ARCHIVO.zip` | Comprime todas las hojas y las instrucciones en un archivo ZIP. |
 | `--preview PNG` | Genera una vista previa del póster con la cuadrícula de corte dibujada. |
@@ -165,6 +168,12 @@ postermaker paisaje.png --pages-high 3 --paper a4 --color grayscale --guide -o p
 
 # Generar póster panorámico en Tabloide con solapamiento de 5 mm y archivo ZIP:
 postermaker foto.jpg --pages-wide 5 --paper tabloide --overlap 5 --zip fotos_mural.zip -o poster.pdf
+
+# Procesar varias imágenes en un único PDF combinado (por defecto):
+postermaker foto1.jpg foto2.png foto3.webp --pages-wide 3 -o todos_los_posters.pdf
+
+# Procesar varias imágenes generando cada póster por separado:
+postermaker foto1.jpg foto2.png --pages-wide 2 --separate -o mis_posters/
 ```
 
 ---

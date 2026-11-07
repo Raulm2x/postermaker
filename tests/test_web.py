@@ -313,3 +313,75 @@ def test_generate_default_margin_3mm(client) -> None:
     assert response.status_code == 200
     payload = response.get_json()
     assert re.search(r"poster_2x\d+_a4_portrait_\d{8}_\d{6}\.pdf$", payload["filename"])
+
+
+def test_generate_batch_combined_default(client) -> None:
+    # Por defecto múltiples imágenes generan un único PDF combinado
+    response = client.post(
+        "/api/generate",
+        data={
+            "image": [
+                (image_bytes(600, 600), "primera.jpg"),
+                (image_bytes(600, 600), "segunda.jpg"),
+            ],
+            "pages_wide": "1",
+            "paper": "letter",
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["isBatch"] is True
+    assert payload["separate"] is False
+    assert payload["posterCount"] == 2
+    assert "posters_combinados_2_imagenes" in payload["filename"]
+    assert payload["filename"].endswith(".pdf")
+
+    pdf_resp = client.get(payload["downloadUrl"])
+    assert pdf_resp.status_code == 200
+    assert pdf_resp.data.startswith(b"%PDF")
+    reader = PdfReader(io.BytesIO(pdf_resp.data))
+    assert len(reader.pages) == 2
+
+
+def test_generate_batch_separate_option(client) -> None:
+    # Opción de generar cada póster por separado
+    response = client.post(
+        "/api/generate",
+        data={
+            "image": [
+                (image_bytes(600, 600), "fotoA.jpg"),
+                (image_bytes(600, 600), "fotoB.jpg"),
+            ],
+            "separate_posters": "true",
+            "pages_wide": "1",
+            "paper": "letter",
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["isBatch"] is True
+    assert payload["separate"] is True
+    assert payload["posterCount"] == 2
+    assert "posters_separados_2_imagenes" in payload["filename"]
+    assert payload["filename"].endswith(".zip")
+    assert len(payload["items"]) == 2
+
+    # Descarga del ZIP completo
+    zip_resp = client.get(payload["downloadUrl"])
+    assert zip_resp.status_code == 200
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(zip_resp.data), "r") as zf:
+        names = zf.namelist()
+        assert len(names) == 2
+        assert any("fotoA" in n for n in names)
+        assert any("fotoB" in n for n in names)
+
+    # Descarga de un póster individual
+    item1 = payload["items"][0]
+    single_resp = client.get(item1["downloadUrl"])
+    assert single_resp.status_code == 200
+    assert single_resp.data.startswith(b"%PDF")
+    reader = PdfReader(io.BytesIO(single_resp.data))
+    assert len(reader.pages) == 1
