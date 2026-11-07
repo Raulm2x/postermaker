@@ -106,6 +106,9 @@ if [ "$(id -u)" -eq 0 ]; then
     SYSTEMD_USER_DIR="/etc/systemd/user"
 else
     SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+    mkdir -p "$HOME/.config/postermaker" "$HOME/.config/blockposters"
+    echo "$PARENT_DIR" > "$HOME/.config/postermaker/repo_path" 2>/dev/null || true
+    echo "$PARENT_DIR" > "$HOME/.config/blockposters/repo_path" 2>/dev/null || true
 fi
 mkdir -p "$SYSTEMD_USER_DIR"
 DEST_SERVICE="$SYSTEMD_USER_DIR/postermaker.service"
@@ -117,6 +120,7 @@ After=network.target
 
 [Service]
 Type=simple
+Environment="POSTERMAKER_REPO_DIR=$PARENT_DIR"
 ExecStart="$DEST_BIN" --server --host 127.0.0.1 --port 8000 --idle-timeout 900
 Restart=no
 Slice=app.slice

@@ -190,10 +190,16 @@ def test_updater_endpoints(client, monkeypatch: pytest.MonkeyPatch) -> None:
     assert "current_version" in data
 
     # 2. Comprobación mockeada
-    monkeypatch.setattr(web.updater, "check_and_update", lambda: {"status": "up_to_date", "message": "Al día"})
+    monkeypatch.setattr(web.updater, "check_updates", lambda: {"status": "available", "latest_version": "0.3.0", "has_update": True})
     chk_resp = client.post("/api/update/check")
     assert chk_resp.status_code == 200
-    assert chk_resp.get_json()["status"] == "up_to_date"
+    assert chk_resp.get_json()["status"] == "available"
+
+    # 3. Aplicar actualización mockeada
+    monkeypatch.setattr(web.updater, "apply_update", lambda: {"status": "updated", "latest_version": "0.3.0", "has_update": False})
+    apply_resp = client.post("/api/update/apply")
+    assert apply_resp.status_code == 200
+    assert apply_resp.get_json()["status"] == "updated"
 
 
 def test_generate_skip_guide_by_default(client) -> None:

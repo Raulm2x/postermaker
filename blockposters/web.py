@@ -287,7 +287,13 @@ def update_status():
 
 @app.post("/api/update/check")
 def update_check():
-    result = updater.check_and_update()
+    result = updater.check_updates()
+    return jsonify(result)
+
+
+@app.post("/api/update/apply")
+def update_apply():
+    result = updater.apply_update()
     return jsonify(result)
 
 
