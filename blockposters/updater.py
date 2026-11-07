@@ -126,7 +126,7 @@ class AutoUpdater:
                 setattr(self, k, v)
 
     def check_updates(self) -> dict[str, Any]:
-        """Comprueba si hay actualizaciones disponibles en Git o GitHub."""
+        """Comprueba si hay actualizaciones disponibles en GitHub Releases o Git."""
         with self._lock:
             if self._in_progress:
                 return self.get_state()
@@ -139,11 +139,19 @@ class AutoUpdater:
                 error=None,
             )
 
+            # 1. Comprobar versiones oficiales en GitHub Releases y Tags
+            gh_state = self._check_github_release()
+            if gh_state.get("has_update"):
+                return gh_state
+
+            # 2. Si no hay release superior en GitHub, comprobar repositorio Git local
             git_root = _find_git_dir()
             if git_root:
-                return self._check_git(git_root)
-            else:
-                return self._check_github_release()
+                git_state = self._check_git(git_root)
+                if git_state.get("has_update"):
+                    return git_state
+
+            return self.get_state()
         finally:
             with self._lock:
                 self._in_progress = False
@@ -311,13 +319,16 @@ class AutoUpdater:
                 error=None,
             )
 
-            git_root = _find_git_dir()
             success = False
 
-            if git_root:
-                success = self._apply_git_update(git_root)
-            else:
-                success = self._apply_github_update()
+            # 1. Intentar actualizar desde GitHub Releases si hay un asset descargable
+            success = self._apply_github_update()
+
+            # 2. Si no o si falló, aplicar cambios desde repositorio Git local si existe
+            if not success:
+                git_root = _find_git_dir()
+                if git_root:
+                    success = self._apply_git_update(git_root)
 
             if success:
                 self._set_state(
