@@ -77,6 +77,15 @@ def _find_git_dir() -> Path | None:
     return None
 
 
+def _parse_version(v: str) -> tuple[int, ...]:
+    """Convierte una cadena de versión semántica (ej. '0.2.2' o 'v0.2.2') en tupla numérica."""
+    try:
+        clean = v.lstrip("v").strip().split("-")[0]
+        return tuple(int(x) for x in clean.split("."))
+    except Exception:
+        return (0, 0, 0)
+
+
 class AutoUpdater:
     """Gestiona la comprobación y aplicación de actualizaciones desde Git o GitHub."""
 
@@ -158,107 +167,128 @@ class AutoUpdater:
             )
             branch = branch_proc.stdout.strip() or "main"
 
-            fetch_proc = subprocess.run(
-                ["git", "-C", str(git_root), "fetch", "origin", branch, "--quiet"],
+            # 1. Fetch ligero de rama y tags remotos
+            subprocess.run(
+                ["git", "-C", str(git_root), "fetch", "origin", "--tags", "--quiet"],
                 capture_output=True,
                 text=True,
                 timeout=8,
                 check=False,
             )
-            if fetch_proc.returncode != 0:
-                self._set_state(
-                    status="up_to_date",
-                    message="Modo sin conexión o sin acceso a remoto.",
-                )
-                return self.get_state()
 
-            local_hash = (
-                subprocess.check_output(
-                    ["git", "-C", str(git_root), "rev-parse", "HEAD"],
-                    text=True,
-                    timeout=2,
-                ).strip()
+            # 2. Comprobar si hay un tag superior a la versión actual del ejecutable
+            tags_proc = subprocess.run(
+                ["git", "-C", str(git_root), "tag", "-l", "v*"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
             )
-            remote_hash = (
-                subprocess.check_output(
-                    ["git", "-C", str(git_root), "rev-parse", f"origin/{branch}"],
-                    text=True,
-                    timeout=2,
-                ).strip()
-            )
+            raw_tags = [t.strip().lstrip("v") for t in tags_proc.stdout.splitlines() if t.strip()]
+            latest_git_tag = max(raw_tags, key=_parse_version) if raw_tags else None
 
-            if local_hash != remote_hash:
-                tag_proc = subprocess.run(
-                    ["git", "-C", str(git_root), "describe", "--tags", f"origin/{branch}"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                    check=False,
-                )
-                latest_tag = tag_proc.stdout.strip().lstrip("v") or "nueva versión"
+            if latest_git_tag and _parse_version(latest_git_tag) > _parse_version(self.current_version):
                 self._set_state(
                     status="available",
                     has_update=True,
-                    latest_version=latest_tag,
-                    message=f"Nueva versión disponible: {latest_tag}.",
+                    latest_version=latest_git_tag,
+                    message=f"Nueva versión disponible: v{latest_git_tag}.",
                 )
-            else:
-                self._set_state(
-                    status="up_to_date",
-                    has_update=False,
-                    latest_version=self.current_version,
-                    message="PosterMaker está en su versión más reciente.",
+                return self.get_state()
+
+            # 3. Comprobar diferencias de commits en la rama actual
+            try:
+                local_hash = (
+                    subprocess.check_output(
+                        ["git", "-C", str(git_root), "rev-parse", "HEAD"],
+                        text=True,
+                        timeout=2,
+                    ).strip()
                 )
-        except Exception as exc:
+                remote_hash = (
+                    subprocess.check_output(
+                        ["git", "-C", str(git_root), "rev-parse", f"origin/{branch}"],
+                        text=True,
+                        timeout=2,
+                    ).strip()
+                )
+                if local_hash != remote_hash:
+                    self._set_state(
+                        status="available",
+                        has_update=True,
+                        latest_version=latest_git_tag or "nueva versión",
+                        message="Nuevos cambios disponibles en el repositorio.",
+                    )
+                    return self.get_state()
+            except Exception:
+                pass
+
             self._set_state(
                 status="up_to_date",
-                message="PosterMaker listo (comprobación remota omitida).",
-                error=str(exc),
+                has_update=False,
+                latest_version=self.current_version,
+                message="PosterMaker está en su versión más reciente.",
             )
+        except Exception as exc:
+            return self._check_github_release()
+
         return self.get_state()
 
     def _check_github_release(self) -> dict[str, Any]:
         """Comprueba versión disponible desde GitHub Releases o Tags."""
         try:
-            req = urllib.request.Request(
-                API_URL,
-                headers={"User-Agent": "PosterMaker-AutoUpdater", "Accept": "application/vnd.github.v3+json"},
-            )
-            tag = None
+            tags_found: list[str] = []
+
+            # 1. Comprobar releases/latest
             try:
+                req = urllib.request.Request(
+                    API_URL,
+                    headers={"User-Agent": "PosterMaker-AutoUpdater", "Accept": "application/vnd.github.v3+json"},
+                )
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode("utf-8"))
-                        tag = data.get("tag_name", "").lstrip("v")
-            except urllib.error.HTTPError as http_err:
-                if http_err.code == 404:
-                    tags_url = f"https://api.github.com/repos/{GITHUB_REPO}/tags"
-                    tags_req = urllib.request.Request(
-                        tags_url,
-                        headers={"User-Agent": "PosterMaker-AutoUpdater", "Accept": "application/vnd.github.v3+json"},
-                    )
-                    with urllib.request.urlopen(tags_req, timeout=5) as tags_resp:
-                        if tags_resp.status == 200:
-                            tags_data = json.loads(tags_resp.read().decode("utf-8"))
-                            if tags_data and isinstance(tags_data, list):
-                                tag = tags_data[0].get("name", "").lstrip("v")
-                else:
-                    raise
+                        t = data.get("tag_name", "").lstrip("v")
+                        if t:
+                            tags_found.append(t)
+            except Exception:
+                pass
 
-            if tag and tag != self.current_version:
-                self._set_state(
-                    status="available",
-                    has_update=True,
-                    latest_version=tag,
-                    message=f"Nueva versión disponible: v{tag}.",
+            # 2. Comprobar tags de GitHub
+            try:
+                tags_url = f"https://api.github.com/repos/{GITHUB_REPO}/tags"
+                tags_req = urllib.request.Request(
+                    tags_url,
+                    headers={"User-Agent": "PosterMaker-AutoUpdater", "Accept": "application/vnd.github.v3+json"},
                 )
-            else:
-                self._set_state(
-                    status="up_to_date",
-                    has_update=False,
-                    latest_version=self.current_version,
-                    message="PosterMaker está en su versión más reciente.",
-                )
+                with urllib.request.urlopen(tags_req, timeout=5) as tags_resp:
+                    if tags_resp.status == 200:
+                        tags_data = json.loads(tags_resp.read().decode("utf-8"))
+                        if tags_data and isinstance(tags_data, list):
+                            for item in tags_data[:5]:
+                                t = item.get("name", "").lstrip("v")
+                                if t:
+                                    tags_found.append(t)
+            except Exception:
+                pass
+
+            if tags_found:
+                best_tag = max(tags_found, key=_parse_version)
+                if _parse_version(best_tag) > _parse_version(self.current_version):
+                    self._set_state(
+                        status="available",
+                        has_update=True,
+                        latest_version=best_tag,
+                        message=f"Nueva versión disponible: v{best_tag}.",
+                    )
+                    return self.get_state()
+
+            self._set_state(
+                status="up_to_date",
+                has_update=False,
+                latest_version=self.current_version,
+                message="PosterMaker está en su versión más reciente.",
+            )
         except Exception as exc:
             self._set_state(
                 status="up_to_date",
