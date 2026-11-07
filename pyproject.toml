@@ -1,6 +1,6 @@
 [project]
 name = "postermaker"
-version = "1.0.0"
+version = "0.2.0"
 description = "PosterMaker: Convierte una imagen en un póster imprimible dividido en hojas Carta, A4, Oficio o Tabloide."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -44,7 +44,7 @@ def generate_poster(
 ) -> PosterResult:
     """Genera el póster completo y devuelve los datos del resultado."""
 
-    margins = margins or Margins.uniform(10.0)
+    margins = margins or Margins.uniform(3.0)
     options = RenderOptions(
         dpi=dpi,
         overlap_mm=overlap_mm,
@@ -68,7 +68,7 @@ def generate_poster(
         )
         prepared = prepare_source(image, grid, color_mode=color_mode)
 
-        with tempfile.TemporaryDirectory(prefix="blockposters-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="postermaker-") as tmp:
             tile_output = Path(tiles_dir) if tiles_dir else Path(tmp) / "tiles"
             render = render_pages(prepared.image, grid, tile_output, options)
             pdf_path = pages_to_pdf(

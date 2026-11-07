@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
 import pytest
@@ -61,6 +62,7 @@ def test_generate_download_and_preview(client) -> None:
     assert payload["widthCm"] > 0
     assert payload["heightCm"] > 0
     assert payload["filename"].endswith(".pdf")
+    assert re.search(r"poster_2x\d+_a4_portrait_\d{8}_\d{6}\.pdf$", payload["filename"])
     assert payload["downloadUrl"].startswith("/api/download/")
     assert payload["previewUrl"].startswith("/api/preview/")
 
@@ -295,3 +297,19 @@ def test_main_reuses_existing_instance(monkeypatch: pytest.MonkeyPatch) -> None:
     code = web.main(["--port", "8000", "--no-update"])
     assert code == 0
     assert len(run_called) == 0
+
+
+def test_generate_default_margin_3mm(client) -> None:
+    # Cuando no se especifica margen, debe usar 3 mm por omisión
+    response = client.post(
+        "/api/generate",
+        data={
+            "image": (image_bytes(800, 600), "foto.jpg"),
+            "pages_wide": "2",
+            "paper": "a4",
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert re.search(r"poster_2x\d+_a4_portrait_\d{8}_\d{6}\.pdf$", payload["filename"])

@@ -24,7 +24,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-o",
         "--output",
-        help="PDF de salida (por defecto: poster.pdf).",
+        help="PDF de salida (por defecto poster_AAAAMMDD_HHMMSS.pdf).",
     )
     parser.add_argument(
         "--pages-wide",
@@ -59,9 +59,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--margin",
         type=float,
-        default=10.0,
+        default=3.0,
         metavar="MM",
-        help="Margen blanco por lado en mm (por defecto 10).",
+        help="Margen blanco por lado en mm (por defecto 3).",
     )
     parser.add_argument("--margin-top", type=float, metavar="MM")
     parser.add_argument("--margin-right", type=float, metavar="MM")
@@ -181,7 +181,11 @@ def main(argv: list[str] | None = None) -> int:
     if not args.image:
         parser.error("indica una imagen o usa --calibration")
 
-    output = Path(args.output or "poster.pdf")
+    if not args.output:
+        import time
+        output = Path(f"poster_{time.strftime('%Y%m%d_%H%M%S')}.pdf")
+    else:
+        output = Path(args.output)
     tiles = Path(args.tiles) if args.tiles else None
     zip_path = Path(args.zip) if args.zip else None
     preview = Path(args.preview) if args.preview else None

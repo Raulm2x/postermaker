@@ -120,7 +120,7 @@ postermaker foto.jpg \
   --paper carta \
   --orientation portrait \
   --color color \
-  --margin 10 \
+  --margin 3 \
   --overlap 4 \
   --marks \
   --labels \
@@ -140,7 +140,7 @@ postermaker foto.jpg \
 | `--paper PAPEL` | Tamaño de papel: `carta`, `letter`, `a4`, `a3`, `a5`, `oficio`, `legal`, `tabloide`, `tabloid`. |
 | `--orientation TIPO` | `portrait` (vertical) o `landscape` (horizontal). |
 | `--color MODO` | Modo de color: `color`, `grayscale` (escala de grises) o `monochrome` (alto contraste). |
-| `--margin MM` | Margen no imprimible en milímetros por lado (por defecto: 10 mm). |
+| `--margin MM` | Margen no imprimible en milímetros por lado (por defecto: 3 mm). |
 | `--margin-top/right/bottom/left` | Márgenes específicos por lado. |
 | `--overlap MM` | Solapamiento entre hojas para recorte y pegado manual (por defecto: 0 mm). |
 | `--dpi N` | Resolución de renderizado en ppp (72 a 600, por defecto: 300). |

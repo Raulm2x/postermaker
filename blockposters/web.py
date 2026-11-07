@@ -191,7 +191,7 @@ def _parse_options(form):
     orientation = str(form.get("orientation", "portrait")).strip().lower()
     if orientation not in ("portrait", "landscape"):
         raise ValueError("La orientación no es válida.")
-    margin = _parse_float(form, "margin", 10.0, 0.0, 30.0, "El margen")
+    margin = _parse_float(form, "margin", 3.0, 0.0, 30.0, "El margen")
     overlap = _parse_float(form, "overlap", 0.0, 0.0, 20.0, "El solapamiento")
     dpi = _parse_int(form, "dpi", 300, 72, 600, "La resolución")
     marks = _parse_bool(form, "marks")
@@ -356,9 +356,10 @@ def generate():
         )
 
     grid = result.grid
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
     filename = (
         f"poster_{grid.pages_wide}x{grid.pages_high}_"
-        f"{grid.paper.key}_{grid.orientation}.pdf"
+        f"{grid.paper.key}_{grid.orientation}_{timestamp}.pdf"
     )
     meta = {
         "filename": filename,

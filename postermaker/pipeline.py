@@ -44,7 +44,7 @@ def generate_poster(
 ) -> PosterResult:
     """Genera el póster completo y devuelve los datos del resultado."""
 
-    margins = margins or Margins.uniform(10.0)
+    margins = margins or Margins.uniform(3.0)
     options = RenderOptions(
         dpi=dpi,
         overlap_mm=overlap_mm,
