@@ -100,7 +100,7 @@ postermaker --web --host 127.0.0.1 --port 8000 --idle-timeout 900
 ```
 
 * `--host`: Dirección IP de escucha (por defecto `127.0.0.1`).
-* `--port`: Puerto de escucha (por defecto `8000`; si está ocupado, busca automáticamente el siguiente).
+* `--port`: Puerto de escucha (por defecto `8000`; si no está disponible, prueba automáticamente con los siguientes de forma sucesiva hasta encontrar uno libre).
 * `--idle-timeout`: Segundos de inactividad antes de liberar memoria y apagarse (por defecto `900`s / 15m; usa `0` para mantenerlo siempre activo).
 
 ---

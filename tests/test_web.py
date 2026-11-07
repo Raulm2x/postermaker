@@ -240,3 +240,58 @@ def test_generate_with_assembly_guide_when_unskipped(client) -> None:
     reader = PdfReader(io.BytesIO(pdf_resp.data))
     # Debe incluir 1 página extra de plano de montaje al inicio
     assert len(reader.pages) == expected_pages
+
+
+def test_find_available_port_sequential() -> None:
+    import socket
+
+    # Seleccionamos un rango de puertos efímeros para la prueba
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        base_port = probe.getsockname()[1]
+
+    # 1. Cuando base_port está libre
+    assert web._find_available_port("127.0.0.1", start_port=base_port) == base_port
+
+    # 2. Cuando base_port y base_port+1 están ocupados
+    s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s1.bind(("127.0.0.1", base_port))
+    s1.listen(1)
+
+    s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s2.bind(("127.0.0.1", base_port + 1))
+    s2.listen(1)
+
+    try:
+        # Debe saltar base_port y base_port+1 y retornar base_port+2 o superior libre
+        found_port = web._find_available_port("127.0.0.1", start_port=base_port)
+        assert found_port >= base_port + 2
+    finally:
+        s1.close()
+        s2.close()
+
+
+def test_main_finds_next_port_when_busy(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+    monkeypatch.setattr(web, "_is_postermaker_running", lambda host, port: False)
+
+    def fake_is_port_available(host: str, port: int) -> bool:
+        return port != 8000
+
+    monkeypatch.setattr(web, "_is_port_available", fake_is_port_available)
+    monkeypatch.setattr(web.app, "run", lambda **kwargs: calls.append(kwargs))
+
+    code = web.main(["--port", "8000", "--no-update"])
+    assert code == 0
+    assert len(calls) == 1
+    assert calls[0]["port"] == 8001
+
+
+def test_main_reuses_existing_instance(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(web, "_is_postermaker_running", lambda host, port: port == 8000)
+    run_called = []
+    monkeypatch.setattr(web.app, "run", lambda **kwargs: run_called.append(kwargs))
+
+    code = web.main(["--port", "8000", "--no-update"])
+    assert code == 0
+    assert len(run_called) == 0

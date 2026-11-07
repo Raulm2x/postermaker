@@ -467,28 +467,44 @@ def http_error(error: HTTPException):
     return error
 
 
-def _is_blockposters_running(host: str, port: int) -> bool:
-    """Comprueba si ya hay una instancia de Block Posters respondiendo en host:port."""
+def _is_postermaker_running(host: str, port: int) -> bool:
+    """Comprueba si ya hay una instancia de PosterMaker respondiendo en host:port."""
+    connect_host = "127.0.0.1" if host in ("0.0.0.0", "") else host
     try:
-        url = f"http://{host}:{port}/api/health"
+        url = f"http://{connect_host}:{port}/api/health"
         req = urllib.request.Request(url, method="GET")
-        with urllib.request.urlopen(req, timeout=0.8) as resp:
+        with urllib.request.urlopen(req, timeout=0.5) as resp:
             return resp.status == 200
     except Exception:
         return False
 
 
-def _find_available_port(host: str, start_port: int, max_attempts: int = 20) -> int:
-    """Encuentra un puerto disponible comenzando en start_port."""
-    for port in range(start_port, start_port + max_attempts):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                s.bind((host, port))
-                return port
-            except OSError:
-                continue
-    return start_port
+_is_blockposters_running = _is_postermaker_running
+
+
+def _is_port_available(host: str, port: int) -> bool:
+    """Comprueba si un puerto está libre para escuchar conexiones en host."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _find_available_port(
+    host: str,
+    start_port: int = 8000,
+    max_port: int = 65535,
+) -> int:
+    """Encuentra el primer puerto libre comenzando en start_port e incrementando sucesivamente."""
+    for port in range(start_port, max_port + 1):
+        if _is_port_available(host, port):
+            return port
+    raise RuntimeError(
+        f"No se encontró ningún puerto disponible para iniciar el servidor entre {start_port} y {max_port}."
+    )
 
 
 def _open_in_browser(url: str) -> None:
@@ -534,7 +550,12 @@ def main(argv: list[str] | None = None) -> int:
         description="Servidor local para crear pósteres imprimibles.",
     )
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Puerto inicial de escucha (por defecto 8000; si está ocupado, prueba con los siguientes hasta encontrar uno libre).",
+    )
     parser.add_argument("--debug", action="store_true")
     parser.add_argument(
         "--open",
@@ -564,27 +585,38 @@ def main(argv: list[str] | None = None) -> int:
 
     target_port = args.port
 
-    # Si ya hay una instancia de PosterMaker activa en el puerto:
-    if _is_blockposters_running(args.host, target_port):
-        url = f"http://{args.host}:{target_port}"
-        print(f"PosterMaker ya está en ejecución en: {url}")
-        if args.open:
-            _open_in_browser(url)
-        return 0
+    # 1. Si PosterMaker ya está corriendo (comprobando el puerto inicial o los siguientes cercanos):
+    for p in range(target_port, min(target_port + 50, 65535 + 1)):
+        if _is_postermaker_running(args.host, p):
+            url = f"http://{args.host}:{p}"
+            print(f"PosterMaker ya está en ejecución en: {url}")
+            if args.open:
+                _open_in_browser(url)
+            return 0
 
-    # Si el puerto está ocupado por otro proceso, buscar el siguiente disponible
+    # 2. Si el puerto inicial no está libre, intentar con los siguientes hasta encontrar uno disponible:
     free_port = _find_available_port(args.host, target_port)
     if free_port != target_port:
-        print(f"Puerto {target_port} ocupado, usando puerto {free_port}")
+        print(f"Puerto {target_port} no disponible. Probando con los siguientes... asignado puerto {free_port}")
         target_port = free_port
 
     url = f"http://{args.host}:{target_port}"
     print(f"PosterMaker local: {url}")
 
     if args.open:
-        import threading
+        def _deferred_open():
+            deadline = time.time() + 4.0
+            opened = False
+            while time.time() < deadline:
+                if _is_postermaker_running(args.host, target_port):
+                    _open_in_browser(url)
+                    opened = True
+                    break
+                time.sleep(0.1)
+            if not opened:
+                _open_in_browser(url)
 
-        threading.Timer(0.3, lambda: _open_in_browser(url)).start()
+        threading.Thread(target=_deferred_open, daemon=True).start()
 
     app.run(host=args.host, port=target_port, debug=args.debug)
     return 0
