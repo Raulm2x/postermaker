@@ -28,6 +28,7 @@ def test_install_and_uninstall_desktop(tmp_path: Path, monkeypatch: pytest.Monke
         "apps": tmp_path / "applications",
         "icons": tmp_path / "icons",
         "pixmaps": tmp_path / "pixmaps",
+        "systemd": tmp_path / "systemd",
     }
     monkeypatch.setattr(installer, "_resolve_paths", lambda: test_paths)
 
@@ -40,6 +41,7 @@ def test_install_and_uninstall_desktop(tmp_path: Path, monkeypatch: pytest.Monke
     dest_desktop = test_paths["apps"] / "postermaker.desktop"
     dest_icon = test_paths["icons"] / "postermaker.svg"
     dest_pixmap = test_paths["pixmaps"] / "postermaker.svg"
+    dest_service = test_paths["systemd"] / "postermaker.service"
 
     assert dest_bin.is_file()
     assert os.access(dest_bin, os.X_OK)
@@ -47,6 +49,7 @@ def test_install_and_uninstall_desktop(tmp_path: Path, monkeypatch: pytest.Monke
     assert dest_desktop.is_file()
     assert dest_icon.is_file()
     assert dest_pixmap.is_file()
+    assert dest_service.is_file()
 
     # Verificar contenido del archivo .desktop
     content = dest_desktop.read_text(encoding="utf-8")
@@ -54,6 +57,13 @@ def test_install_and_uninstall_desktop(tmp_path: Path, monkeypatch: pytest.Monke
     assert "Name=PosterMaker" in content
     assert "Icon=postermaker" in content
     assert "Exec=" in content
+
+    # Verificar contenido del servicio systemd
+    service_content = dest_service.read_text(encoding="utf-8")
+    assert "[Unit]" in service_content
+    assert "[Service]" in service_content
+    assert "ExecStart=" in service_content
+    assert "--server" in service_content
 
     # 2. Probar desinstalación
     code_un = installer.uninstall_desktop()
@@ -64,6 +74,7 @@ def test_install_and_uninstall_desktop(tmp_path: Path, monkeypatch: pytest.Monke
     assert not dest_desktop.is_file()
     assert not dest_icon.is_file()
     assert not dest_pixmap.is_file()
+    assert not dest_service.is_file()
 
 
 def test_cli_install_uninstall_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,6 +83,7 @@ def test_cli_install_uninstall_flags(tmp_path: Path, monkeypatch: pytest.MonkeyP
         "apps": tmp_path / "applications",
         "icons": tmp_path / "icons",
         "pixmaps": tmp_path / "pixmaps",
+        "systemd": tmp_path / "systemd",
     }
     monkeypatch.setattr(installer, "_resolve_paths", lambda: test_paths)
 

@@ -83,17 +83,22 @@ Accede a <http://localhost:8000>.
 
 ---
 
-## Uso de la interfaz Web
+## Uso de la aplicación
 
-Inicia la aplicación ejecutando en tu terminal:
+### Experiencia transparente con systemd (por defecto)
 
-```bash
-postermaker
-```
+PosterMaker está diseñado para que nunca tengas que gestionar terminales ni puertos locales manualmente:
 
-O seleccionando **PosterMaker** en tu lanzador de aplicaciones. Se abrirá automáticamente tu navegador predeterminado en `http://127.0.0.1:8000`.
+1. Abre **PosterMaker** desde el menú de aplicaciones de tu escritorio o ejecutando en el terminal:
+   ```bash
+   postermaker
+   ```
+2. El lanzador se comunica automáticamente con el servicio de usuario de systemd (`postermaker.service`), levanta el servidor en segundo plano si está en reposo y abre directamente la interfaz en tu navegador predeterminado.
+3. Tras 15 minutos de inactividad, el servidor se apaga solo para liberar memoria RAM del sistema (reposo de **0 MB**). La próxima vez que abras PosterMaker, se reactivará al instante.
 
-### Opciones del servidor:
+### Opciones manuales del servidor web:
+
+Si deseas ejecutar el servidor web directamente en primer plano o cambiar los parámetros:
 
 ```bash
 postermaker --web --host 127.0.0.1 --port 8000 --idle-timeout 900
@@ -164,18 +169,24 @@ postermaker foto.jpg --pages-wide 5 --paper tabloide --overlap 5 --zip fotos_mur
 
 ---
 
-## Liberación de recursos y servicio systemd (Opcional)
+## Gestión del servicio systemd (a nivel de usuario)
 
-Si utilizas un entorno con systemd (Arch, CachyOS, Ubuntu, Fedora, etc.) y deseas que PosterMaker consuma **0 MB de RAM en reposo**, puedes activar el socket de usuario:
+Al instalar PosterMaker, el instalador configura automáticamente un servicio systemd de usuario en `~/.config/systemd/user/postermaker.service`.
 
-```bash
-mkdir -p ~/.config/systemd/user
-cp systemd/postermaker.socket systemd/postermaker.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now postermaker.socket
-```
-
-* **¿Cómo opera?** systemd vigila el puerto 8000 sin consumir memoria RAM. En cuanto abres `http://127.0.0.1:8000` en tu navegador o lanzador, systemd levanta el servidor al instante. Tras el tiempo de inactividad programado, el servidor se apaga y vuelve al reposo de 0 MB.
+* **Estado del servicio:**
+  ```bash
+  systemctl --user status postermaker.service
+  ```
+* **Ver registros en tiempo real:**
+  ```bash
+  journalctl --user -u postermaker.service -f
+  ```
+* **Iniciar o detener manualmente:**
+  ```bash
+  systemctl --user start postermaker.service
+  systemctl --user stop postermaker.service
+  ```
+* **Liberación de recursos (0 MB en reposo):** Tras 15 minutos sin pestañas abiertas ni actividad, el servicio se detiene de forma limpia. Al volver a abrir PosterMaker desde tu escritorio o terminal, se inicia automáticamente. En sistemas sin systemd, PosterMaker cuenta con fallback directo transparente.
 
 ---
 

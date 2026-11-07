@@ -16,18 +16,21 @@ def _resolve_paths() -> dict[str, Path]:
         apps_dir = Path("/usr/local/share/applications")
         icons_dir = Path("/usr/local/share/icons/hicolor/scalable/apps")
         pixmaps_dir = Path("/usr/share/pixmaps")
+        systemd_dir = Path("/etc/systemd/user")
     else:
         home = Path.home()
         bin_dir = home / ".local/bin"
         apps_dir = home / ".local/share/applications"
         icons_dir = home / ".local/share/icons/hicolor/scalable/apps"
         pixmaps_dir = home / ".local/share/pixmaps"
+        systemd_dir = home / ".config/systemd/user"
 
     return {
         "bin": bin_dir,
         "apps": apps_dir,
         "icons": icons_dir,
         "pixmaps": pixmaps_dir,
+        "systemd": systemd_dir,
     }
 
 
@@ -135,7 +138,7 @@ def install_desktop() -> int:
         "Name=PosterMaker\n"
         "GenericName=Pósteres Imprimibles\n"
         "Comment=Convierte imágenes en pósteres imprimibles divididos en hojas\n"
-        f'Exec="{dest_bin}" --web --open\n'
+        f'Exec="{dest_bin}"\n'
         "Icon=postermaker\n"
         "Terminal=false\n"
         "Categories=Graphics;Publishing;\n"
@@ -154,7 +157,45 @@ def install_desktop() -> int:
         except OSError:
             pass
 
-    # 4. Actualizar bases de datos de escritorio de Linux
+    # 4. Instalar servicio systemd de usuario
+    systemd_dir = paths.get("systemd")
+    if not systemd_dir:
+        systemd_dir = paths["apps"].parent / "systemd/user" if "apps" in paths else Path.home() / ".config/systemd/user"
+    systemd_dir.mkdir(parents=True, exist_ok=True)
+    dest_service = systemd_dir / "postermaker.service"
+    service_content = (
+        "[Unit]\n"
+        "Description=Servidor local de PosterMaker\n"
+        "Documentation=https://github.com/Raulm2x/postermaker\n"
+        "After=network.target\n\n"
+        "[Service]\n"
+        "Type=simple\n"
+        f'ExecStart="{dest_bin}" --server --host 127.0.0.1 --port 8000 --idle-timeout 900\n'
+        "Restart=no\n"
+        "Slice=app.slice\n"
+        "StandardOutput=journal\n"
+        "StandardError=journal\n\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+    dest_service.write_text(service_content, encoding="utf-8")
+    dest_service.chmod(0o644)
+
+    old_service = systemd_dir / "blockposters.service"
+    if old_service.is_file():
+        try:
+            old_service.unlink()
+        except OSError:
+            pass
+
+    if shutil.which("systemctl"):
+        try:
+            subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True, check=False)
+            subprocess.run(["systemctl", "--user", "enable", "postermaker.service"], capture_output=True, check=False)
+        except Exception:
+            pass
+
+    # 5. Actualizar bases de datos de escritorio de Linux
     try:
         subprocess.run(["update-desktop-database", str(apps_dir)], capture_output=True, check=False)
     except Exception:
@@ -170,6 +211,7 @@ def install_desktop() -> int:
     print(f"Ejecutable: {dest_bin}")
     print(f"Acceso directo: {dest_desktop}")
     print(f"Icono: {icons_dir / 'postermaker.svg'}")
+    print(f"Servicio systemd (usuario): {dest_service}")
     print("")
     print("Ya puedes abrir 'PosterMaker' desde tu lanzador de aplicaciones")
     print("o ejecutar 'postermaker' en tu terminal.")
@@ -185,10 +227,20 @@ def install_desktop() -> int:
 
 
 def uninstall_desktop() -> int:
-    """Elimina el binario, el icono y el archivo .desktop del sistema."""
+    """Elimina el binario, el icono, el archivo .desktop y el servicio systemd del sistema."""
 
     paths = _resolve_paths()
     removed = []
+
+    systemd_dir = paths.get("systemd")
+    if not systemd_dir:
+        systemd_dir = paths["apps"].parent / "systemd/user" if "apps" in paths else Path.home() / ".config/systemd/user"
+    if shutil.which("systemctl"):
+        try:
+            subprocess.run(["systemctl", "--user", "stop", "postermaker.service"], capture_output=True, check=False)
+            subprocess.run(["systemctl", "--user", "disable", "postermaker.service"], capture_output=True, check=False)
+        except Exception:
+            pass
 
     targets = [
         paths["bin"] / "postermaker",
@@ -199,6 +251,8 @@ def uninstall_desktop() -> int:
         paths["icons"] / "blockposters.svg",
         paths["pixmaps"] / "postermaker.svg",
         paths["pixmaps"] / "blockposters.svg",
+        systemd_dir / "postermaker.service",
+        systemd_dir / "blockposters.service",
     ]
 
     for target in targets:
@@ -208,6 +262,12 @@ def uninstall_desktop() -> int:
                 removed.append(str(target))
             except OSError as exc:
                 print(f"No se pudo eliminar {target}: {exc}", file=sys.stderr)
+
+    if shutil.which("systemctl"):
+        try:
+            subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True, check=False)
+        except Exception:
+            pass
 
     try:
         subprocess.run(["update-desktop-database", str(paths["apps"])], capture_output=True, check=False)

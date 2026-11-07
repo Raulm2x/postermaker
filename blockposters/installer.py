@@ -16,18 +16,21 @@ def _resolve_paths() -> dict[str, Path]:
         apps_dir = Path("/usr/local/share/applications")
         icons_dir = Path("/usr/local/share/icons/hicolor/scalable/apps")
         pixmaps_dir = Path("/usr/share/pixmaps")
+        systemd_dir = Path("/etc/systemd/user")
     else:
         home = Path.home()
         bin_dir = home / ".local/bin"
         apps_dir = home / ".local/share/applications"
         icons_dir = home / ".local/share/icons/hicolor/scalable/apps"
         pixmaps_dir = home / ".local/share/pixmaps"
+        systemd_dir = home / ".config/systemd/user"
 
     return {
         "bin": bin_dir,
         "apps": apps_dir,
         "icons": icons_dir,
         "pixmaps": pixmaps_dir,
+        "systemd": systemd_dir,
     }
 
 
@@ -37,8 +40,10 @@ def _get_icon_bytes() -> bytes:
     # 1. Empaquetado congelado en sys._MEIPASS
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         for cand in (
+            Path(sys._MEIPASS) / "postermaker/static/favicon.svg",
             Path(sys._MEIPASS) / "blockposters/static/favicon.svg",
             Path(sys._MEIPASS) / "static/favicon.svg",
+            Path(sys._MEIPASS) / "postermaker.svg",
             Path(sys._MEIPASS) / "blockposters.svg",
         ):
             if cand.is_file():
@@ -46,13 +51,18 @@ def _get_icon_bytes() -> bytes:
 
     # 2. Junto al ejecutable
     exe_dir = Path(sys.executable).resolve().parent
-    for cand in (exe_dir / "blockposters.svg", exe_dir / "favicon.svg"):
+    for cand in (
+        exe_dir / "postermaker.svg",
+        exe_dir / "blockposters.svg",
+        exe_dir / "favicon.svg",
+    ):
         if cand.is_file():
             return cand.read_bytes()
 
     # 3. Código fuente del proyecto
     pkg_dir = Path(__file__).resolve().parent
     for cand in (
+        pkg_dir.parent / "postermaker.svg",
         pkg_dir.parent / "blockposters.svg",
         pkg_dir / "static/favicon.svg",
     ):
@@ -72,7 +82,7 @@ def _get_icon_bytes() -> bytes:
 
 
 def install_desktop() -> int:
-    """Instala el binario, el icono SVG y el archivo .desktop en el sistema."""
+    """Instala el binario, el icono SVG y el archivo .desktop de PosterMaker en el sistema."""
 
     paths = _resolve_paths()
     bin_dir = paths["bin"]
@@ -83,7 +93,8 @@ def install_desktop() -> int:
     for d in (bin_dir, apps_dir, icons_dir, pixmaps_dir):
         d.mkdir(parents=True, exist_ok=True)
 
-    dest_bin = bin_dir / "blockposters"
+    dest_bin = bin_dir / "postermaker"
+    alias_bin = bin_dir / "blockposters"
 
     # 1. Instalar binario o wrapper
     if getattr(sys, "frozen", False):
@@ -100,37 +111,91 @@ def install_desktop() -> int:
         py_bin = sys.executable
         wrapper = (
             "#!/bin/sh\n"
-            f'exec "{py_bin}" -m blockposters "$@"\n'
+            f'exec "{py_bin}" -m postermaker "$@"\n'
         )
         dest_bin.write_text(wrapper, encoding="utf-8")
 
     dest_bin.chmod(0o755)
 
+    # Crear enlace simbólico de compatibilidad para blockposters
+    try:
+        if alias_bin.is_symlink() or alias_bin.is_file():
+            alias_bin.unlink()
+        alias_bin.symlink_to(dest_bin.name)
+    except Exception:
+        pass
+
     # 2. Instalar icono en hicolor y pixmaps
     icon_data = _get_icon_bytes()
-    (icons_dir / "blockposters.svg").write_bytes(icon_data)
-    (pixmaps_dir / "blockposters.svg").write_bytes(icon_data)
+    (icons_dir / "postermaker.svg").write_bytes(icon_data)
+    (pixmaps_dir / "postermaker.svg").write_bytes(icon_data)
 
     # 3. Instalar archivo .desktop
     desktop_content = (
         "[Desktop Entry]\n"
         "Version=1.0\n"
         "Type=Application\n"
-        "Name=Block Posters Local\n"
+        "Name=PosterMaker\n"
         "GenericName=Pósteres Imprimibles\n"
         "Comment=Convierte imágenes en pósteres imprimibles divididos en hojas\n"
-        f'Exec="{dest_bin}" --web --open\n'
-        "Icon=blockposters\n"
+        f'Exec="{dest_bin}"\n'
+        "Icon=postermaker\n"
         "Terminal=false\n"
         "Categories=Graphics;Publishing;\n"
-        "Keywords=poster;print;mural;blockposters;pdf;\n"
+        "Keywords=poster;print;mural;postermaker;pdf;\n"
         "StartupNotify=false\n"
     )
-    dest_desktop = apps_dir / "blockposters.desktop"
+    dest_desktop = apps_dir / "postermaker.desktop"
     dest_desktop.write_text(desktop_content, encoding="utf-8")
     dest_desktop.chmod(0o644)
 
-    # 4. Actualizar bases de datos de escritorio de Linux
+    # Limpiar el viejo lanzador blockposters.desktop si existía
+    old_desktop = apps_dir / "blockposters.desktop"
+    if old_desktop.is_file():
+        try:
+            old_desktop.unlink()
+        except OSError:
+            pass
+
+    # 4. Instalar servicio systemd de usuario
+    systemd_dir = paths.get("systemd")
+    if not systemd_dir:
+        systemd_dir = paths["apps"].parent / "systemd/user" if "apps" in paths else Path.home() / ".config/systemd/user"
+    systemd_dir.mkdir(parents=True, exist_ok=True)
+    dest_service = systemd_dir / "postermaker.service"
+    service_content = (
+        "[Unit]\n"
+        "Description=Servidor local de PosterMaker\n"
+        "Documentation=https://github.com/Raulm2x/postermaker\n"
+        "After=network.target\n\n"
+        "[Service]\n"
+        "Type=simple\n"
+        f'ExecStart="{dest_bin}" --server --host 127.0.0.1 --port 8000 --idle-timeout 900\n'
+        "Restart=no\n"
+        "Slice=app.slice\n"
+        "StandardOutput=journal\n"
+        "StandardError=journal\n\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+    dest_service.write_text(service_content, encoding="utf-8")
+    dest_service.chmod(0o644)
+
+    old_service = systemd_dir / "blockposters.service"
+    if old_service.is_file():
+        try:
+            old_service.unlink()
+        except OSError:
+            pass
+
+    if shutil.which("systemctl"):
+        try:
+            subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True, check=False)
+            subprocess.run(["systemctl", "--user", "enable", "postermaker.service"], capture_output=True, check=False)
+        except Exception:
+            pass
+
+    # 5. Actualizar bases de datos de escritorio de Linux
     try:
         subprocess.run(["update-desktop-database", str(apps_dir)], capture_output=True, check=False)
     except Exception:
@@ -142,13 +207,14 @@ def install_desktop() -> int:
     except Exception:
         pass
 
-    print("=== Instalación de Block Posters completada con éxito ===")
+    print("=== Instalación de PosterMaker completada con éxito ===")
     print(f"Ejecutable: {dest_bin}")
     print(f"Acceso directo: {dest_desktop}")
-    print(f"Icono: {icons_dir / 'blockposters.svg'}")
+    print(f"Icono: {icons_dir / 'postermaker.svg'}")
+    print(f"Servicio systemd (usuario): {dest_service}")
     print("")
-    print("Ya puedes abrir 'Block Posters Local' desde tu lanzador de aplicaciones")
-    print("o ejecutar 'blockposters' en tu terminal.")
+    print("Ya puedes abrir 'PosterMaker' desde tu lanzador de aplicaciones")
+    print("o ejecutar 'postermaker' en tu terminal.")
 
     # Advertencia si ~/.local/bin no está en PATH
     path_env = os.environ.get("PATH", "").split(os.pathsep)
@@ -161,25 +227,47 @@ def install_desktop() -> int:
 
 
 def uninstall_desktop() -> int:
-    """Elimina el binario, el icono y el archivo .desktop del sistema."""
+    """Elimina el binario, el icono, el archivo .desktop y el servicio systemd del sistema."""
 
     paths = _resolve_paths()
     removed = []
 
+    systemd_dir = paths.get("systemd")
+    if not systemd_dir:
+        systemd_dir = paths["apps"].parent / "systemd/user" if "apps" in paths else Path.home() / ".config/systemd/user"
+    if shutil.which("systemctl"):
+        try:
+            subprocess.run(["systemctl", "--user", "stop", "postermaker.service"], capture_output=True, check=False)
+            subprocess.run(["systemctl", "--user", "disable", "postermaker.service"], capture_output=True, check=False)
+        except Exception:
+            pass
+
     targets = [
+        paths["bin"] / "postermaker",
         paths["bin"] / "blockposters",
+        paths["apps"] / "postermaker.desktop",
         paths["apps"] / "blockposters.desktop",
+        paths["icons"] / "postermaker.svg",
         paths["icons"] / "blockposters.svg",
+        paths["pixmaps"] / "postermaker.svg",
         paths["pixmaps"] / "blockposters.svg",
+        systemd_dir / "postermaker.service",
+        systemd_dir / "blockposters.service",
     ]
 
     for target in targets:
-        if target.is_file():
+        if target.is_file() or target.is_symlink():
             try:
                 target.unlink()
                 removed.append(str(target))
             except OSError as exc:
                 print(f"No se pudo eliminar {target}: {exc}", file=sys.stderr)
+
+    if shutil.which("systemctl"):
+        try:
+            subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True, check=False)
+        except Exception:
+            pass
 
     try:
         subprocess.run(["update-desktop-database", str(paths["apps"])], capture_output=True, check=False)
@@ -192,6 +280,6 @@ def uninstall_desktop() -> int:
         for r in removed:
             print(f"  - {r}")
     else:
-        print("No se encontraron archivos de Block Posters instalados en las rutas estándar.")
+        print("No se encontraron archivos de PosterMaker instalados en las rutas estándar.")
 
     return 0

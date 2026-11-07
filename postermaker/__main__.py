@@ -29,6 +29,11 @@ def main(argv: list[str] | None = None) -> int:
     if any(a in ("--uninstall", "uninstall") for a in args):
         return uninstall_desktop()
 
+    # Modo servidor directo (invocado por el servicio systemd o explícitamente con --server)
+    if "--server" in args:
+        server_args = [a for a in args if a != "--server"]
+        return web_main(server_args)
+
     # Si se invoca sin argumentos o se solicita la interfaz web:
     web_triggers = {"--web", "-w", "web", "--gui", "-g"}
     is_web = (
@@ -38,10 +43,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if is_web:
-        web_args = [a for a in args if a not in web_triggers]
-        if "--open" not in web_args:
-            web_args.append("--open")
-        return web_main(web_args)
+        from postermaker.service import launch_or_open
+
+        clean_args = [a for a in args if a not in web_triggers]
+        return launch_or_open(clean_args, web_runner=web_main)
 
     return cli_main(args)
 

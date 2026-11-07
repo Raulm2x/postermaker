@@ -88,7 +88,7 @@ Type=Application
 Name=PosterMaker
 GenericName=Pósteres Imprimibles
 Comment=Convierte imágenes en pósteres imprimibles divididos en hojas
-Exec="$DEST_BIN" --web --open
+Exec="$DEST_BIN"
 Icon=postermaker
 Terminal=false
 Categories=Graphics;Publishing;
@@ -101,7 +101,43 @@ echo "-> Acceso directo instalado en: $DEST_DESKTOP"
 # Eliminar el antiguo lanzador blockposters.desktop si existiera
 rm -f "$APPS_DIR/blockposters.desktop" 2>/dev/null || true
 
-# 4. Actualizar cachés de Linux si las herramientas están instaladas
+# 4. Instalar servicio systemd a nivel de usuario
+if [ "$(id -u)" -eq 0 ]; then
+    SYSTEMD_USER_DIR="/etc/systemd/user"
+else
+    SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+fi
+mkdir -p "$SYSTEMD_USER_DIR"
+DEST_SERVICE="$SYSTEMD_USER_DIR/postermaker.service"
+cat <<EOF > "$DEST_SERVICE"
+[Unit]
+Description=Servidor local de PosterMaker (con apagado por inactividad)
+Documentation=https://github.com/Raulm2x/postermaker
+After=network.target
+
+[Service]
+Type=simple
+ExecStart="$DEST_BIN" --server --host 127.0.0.1 --port 8000 --idle-timeout 900
+Restart=no
+Slice=app.slice
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+EOF
+chmod 644 "$DEST_SERVICE"
+echo "-> Servicio systemd de usuario instalado en: $DEST_SERVICE"
+
+# Eliminar viejo servicio blockposters si existiera
+rm -f "$SYSTEMD_USER_DIR/blockposters.service" 2>/dev/null || true
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user enable postermaker.service 2>/dev/null || true
+fi
+
+# 5. Actualizar cachés de Linux si las herramientas están instaladas
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$APPS_DIR" 2>/dev/null || true
 fi

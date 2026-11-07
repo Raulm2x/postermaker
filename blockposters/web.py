@@ -603,6 +603,12 @@ def main(argv: list[str] | None = None) -> int:
     url = f"http://{args.host}:{target_port}"
     print(f"PosterMaker local: {url}")
 
+    import atexit
+    from .service import write_server_info, remove_server_info
+
+    write_server_info(args.host, target_port, os.getpid())
+    atexit.register(remove_server_info)
+
     if args.open:
         def _deferred_open():
             deadline = time.time() + 4.0
@@ -618,7 +624,10 @@ def main(argv: list[str] | None = None) -> int:
 
         threading.Thread(target=_deferred_open, daemon=True).start()
 
-    app.run(host=args.host, port=target_port, debug=args.debug)
+    try:
+        app.run(host=args.host, port=target_port, debug=args.debug)
+    finally:
+        remove_server_info()
     return 0
 
 

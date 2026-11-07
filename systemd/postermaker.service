@@ -1,13 +1,15 @@
 [Unit]
 Description=Servidor local de PosterMaker (con apagado por inactividad)
+Documentation=https://github.com/Raulm2x/postermaker
 After=network.target
-Requires=postermaker.socket
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/postermaker --web --host 127.0.0.1 --port 8000 --idle-timeout 600
+ExecStart=%h/.local/bin/postermaker --server --host 127.0.0.1 --port 8000 --idle-timeout 900
 Restart=no
 Slice=app.slice
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target

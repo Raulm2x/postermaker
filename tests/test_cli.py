@@ -98,6 +98,10 @@ def test_main_entrypoint_routing(monkeypatch: pytest.MonkeyPatch) -> None:
     assert bp_main.main(["--install"]) == 0
     assert install_calls == [True]
 
-    # 4. CLI normal
+    # 4. Con --server (invocado por systemd)
+    assert bp_main.main(["--server", "--port", "8000"]) == 0
+    assert web_calls[-1] == ["--port", "8000"]
+
+    # 5. CLI normal
     assert bp_main.main(["imagen.png", "-o", "out.pdf"]) == 0
     assert cli_calls[-1] == ["imagen.png", "-o", "out.pdf"]
