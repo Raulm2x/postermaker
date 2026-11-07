@@ -1,0 +1,13 @@
+[Unit]
+Description=Servidor local de PosterMaker (con apagado por inactividad)
+After=network.target
+Requires=postermaker.socket
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/postermaker --web --host 127.0.0.1 --port 8000 --idle-timeout 600
+Restart=no
+Slice=app.slice
+
+[Install]
+WantedBy=default.target

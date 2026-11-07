@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=PosterMaker
+GenericName=Pósteres Imprimibles
+Comment=Convierte imágenes en pósteres imprimibles divididos en hojas
+Exec=postermaker --web --open
+Icon=postermaker
+Terminal=false
+Categories=Graphics;Publishing;
+Keywords=poster;print;mural;postermaker;pdf;
+StartupNotify=false

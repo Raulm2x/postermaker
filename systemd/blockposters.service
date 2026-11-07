@@ -1,0 +1,13 @@
+[Unit]
+Description=Servidor local de Block Posters (con apagado por inactividad)
+After=network.target
+Requires=blockposters.socket
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/blockposters --web --host 127.0.0.1 --port 8000 --idle-timeout 600
+Restart=no
+Slice=app.slice
+
+[Install]
+WantedBy=default.target
