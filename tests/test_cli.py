@@ -105,3 +105,45 @@ def test_main_entrypoint_routing(monkeypatch: pytest.MonkeyPatch) -> None:
     # 5. CLI normal
     assert bp_main.main(["imagen.png", "-o", "out.pdf"]) == 0
     assert cli_calls[-1] == ["imagen.png", "-o", "out.pdf"]
+
+
+def test_cli_batch_combined_default(tmp_path: Path) -> None:
+    from pypdf import PdfReader
+
+    src1 = make_test_image(tmp_path / "img1.jpg")
+    src2 = make_test_image(tmp_path / "img2.jpg")
+    out_pdf = tmp_path / "combined.pdf"
+
+    code = main([str(src1), str(src2), "-o", str(out_pdf), "--pages-high", "1"])
+    assert code == 0
+    assert out_pdf.is_file()
+    reader = PdfReader(str(out_pdf))
+    # 2 imágenes cuadradas de 1 hoja de alto en papel vertical producen 2x1 = 2 hojas cada una -> total 4 páginas
+    assert len(reader.pages) == 4
+
+
+def test_cli_batch_separate(tmp_path: Path) -> None:
+    src1 = make_test_image(tmp_path / "img1.jpg")
+    src2 = make_test_image(tmp_path / "img2.jpg")
+    out_dir = tmp_path / "posters_out"
+
+    code = main([str(src1), str(src2), "--separate", "-o", str(out_dir), "--pages-high", "1"])
+    assert code == 0
+    pdf1 = out_dir / "poster_01_img1.pdf"
+    pdf2 = out_dir / "poster_02_img2.pdf"
+    assert pdf1.is_file()
+    assert pdf2.is_file()
+
+
+def test_cli_batch_separate_zip(tmp_path: Path) -> None:
+    src1 = make_test_image(tmp_path / "img1.jpg")
+    src2 = make_test_image(tmp_path / "img2.jpg")
+    out_zip = tmp_path / "posters.zip"
+
+    code = main([str(src1), str(src2), "--separate", "-o", str(out_zip), "--pages-high", "1"])
+    assert code == 0
+    assert out_zip.is_file()
+    with zipfile.ZipFile(out_zip, "r") as zf:
+        names = zf.namelist()
+        assert any("img1" in n for n in names)
+        assert any("img2" in n for n in names)

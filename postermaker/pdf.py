@@ -12,8 +12,8 @@ from .grid import Grid
 
 def pages_to_pdf(
     page_paths: Iterable[str | Path],
-    grid: Grid,
-    output_path: str | Path,
+    grid: Grid | None = None,
+    output_path: str | Path = "poster.pdf",
     *,
     title: str = "Póster para imprimir",
 ) -> Path:
@@ -29,15 +29,21 @@ def pages_to_pdf(
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    page_size_pt = (
-        img2pdf.mm_to_pt(grid.page_width_mm),
-        img2pdf.mm_to_pt(grid.page_height_mm),
-    )
-    layout = img2pdf.get_layout_fun(page_size_pt)
-    data = img2pdf.convert(
-        [str(path) for path in paths],
-        layout_fun=layout,
-        title=title,
-    )
+    if grid is not None:
+        page_size_pt = (
+            img2pdf.mm_to_pt(grid.page_width_mm),
+            img2pdf.mm_to_pt(grid.page_height_mm),
+        )
+        layout = img2pdf.get_layout_fun(page_size_pt)
+        data = img2pdf.convert(
+            [str(path) for path in paths],
+            layout_fun=layout,
+            title=title,
+        )
+    else:
+        data = img2pdf.convert(
+            [str(path) for path in paths],
+            title=title,
+        )
     output.write_bytes(data)
     return output

@@ -193,7 +193,7 @@ class AutoUpdater:
         return self.get_state()
 
     def _update_from_github_release(self) -> dict[str, Any]:
-        """Comprueba actualizaciones a través de la API pública de GitHub Releases."""
+        """Comprueba actualizaciones a través de la API pública de GitHub Releases o Tags."""
         self._set_state(
             status="checking",
             message="Comprobando versión en GitHub...",
@@ -205,25 +205,41 @@ class AutoUpdater:
                 API_URL,
                 headers={"User-Agent": "PosterMaker-AutoUpdater", "Accept": "application/vnd.github.v3+json"},
             )
-            with urllib.request.urlopen(req, timeout=4) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    tag = data.get("tag_name", "").lstrip("v")
-                    if tag and tag != __version__:
-                        self._set_state(
-                            status="available",
-                            has_update=True,
-                            latest_version=tag,
-                            message=f"Nueva versión disponible: v{tag}.",
-                        )
-                    else:
-                        self._set_state(
-                            status="up_to_date",
-                            has_update=False,
-                            message="PosterMaker está en su versión más reciente.",
-                        )
+            tag = None
+            try:
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        tag = data.get("tag_name", "").lstrip("v")
+            except urllib.error.HTTPError as http_err:
+                if http_err.code == 404:
+                    # Fallback a tags si no hay releases creadas en GitHub
+                    tags_url = f"https://api.github.com/repos/{GITHUB_REPO}/tags"
+                    tags_req = urllib.request.Request(
+                        tags_url,
+                        headers={"User-Agent": "PosterMaker-AutoUpdater", "Accept": "application/vnd.github.v3+json"},
+                    )
+                    with urllib.request.urlopen(tags_req, timeout=4) as tags_resp:
+                        if tags_resp.status == 200:
+                            tags_data = json.loads(tags_resp.read().decode("utf-8"))
+                            if tags_data and isinstance(tags_data, list):
+                                tag = tags_data[0].get("name", "").lstrip("v")
                 else:
-                    self._set_state(status="up_to_date", message="PosterMaker al día.")
+                    raise
+
+            if tag and tag != __version__:
+                self._set_state(
+                    status="available",
+                    has_update=True,
+                    latest_version=tag,
+                    message=f"Nueva versión disponible: v{tag}.",
+                )
+            else:
+                self._set_state(
+                    status="up_to_date",
+                    has_update=False,
+                    message="PosterMaker está en su versión más reciente.",
+                )
 
         except Exception as exc:
             self._set_state(

@@ -61,8 +61,8 @@
           </div>
 
           <div class="dropzone" id="dropzone" tabindex="0" role="button"
-               aria-label="Seleccionar una imagen JPG o PNG">
-            <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" hidden>
+               aria-label="Seleccionar una o varias imágenes JPG o PNG">
+            <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" multiple hidden>
             <div class="dropzone-icon" aria-hidden="true">
               <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6">
                 <rect x="5" y="8" width="38" height="32" rx="4"/>
@@ -70,12 +70,19 @@
                 <path d="M8 34l10-9 7 6 6-5 9 8"/>
               </svg>
             </div>
-            <p class="dropzone-title">Arrastra tu imagen aquí</p>
-            <p class="dropzone-copy">o haz clic para elegir un archivo</p>
-            <span class="dropzone-meta">JPG, PNG o WebP · máx. 25 MB</span>
+            <p class="dropzone-title">Arrastra tus imágenes aquí</p>
+            <p class="dropzone-copy">o haz clic para elegir archivos</p>
+            <span class="dropzone-meta">JPG, PNG o WebP · una o varias imágenes</span>
           </div>
 
           <div class="preview-stage" id="preview-stage" hidden>
+            <div class="batch-bar" id="batch-bar" hidden>
+              <div class="batch-bar-header">
+                <span id="batch-count" class="batch-count">0 imágenes</span>
+                <span class="batch-hint">Haz clic en una miniatura para ver su póster</span>
+              </div>
+              <div class="batch-thumbs" id="batch-thumbs"></div>
+            </div>
             <div class="canvas-wrap" id="canvas-wrap">
               <canvas id="preview-canvas" aria-label="Vista previa del póster con guías de corte"></canvas>
             </div>
@@ -234,6 +241,11 @@
                 <span class="switch-track" aria-hidden="true"></span>
                 <span>Omitir plano de montaje</span>
               </label>
+              <label class="switch" id="separate-wrap" title="Si seleccionas varias imágenes y activas esta opción, se generará un póster independiente para cada una en lugar de un único PDF combinado.">
+                <input type="checkbox" id="separate-posters" name="separate_posters">
+                <span class="switch-track" aria-hidden="true"></span>
+                <span>Pósteres por separado</span>
+              </label>
             </div>
 
             <div class="summary" id="summary">
@@ -262,7 +274,7 @@
                   <svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2"/></svg>
                 </span>
                 <div>
-                  <strong>Tu PDF está listo</strong>
+                  <strong id="result-title">Tu PDF está listo</strong>
                   <span id="result-detail">—</span>
                 </div>
               </div>
@@ -272,6 +284,10 @@
                   <path d="M10 3v10M5.5 9l4.5 4.5L14.5 9M4 17h12" fill="none" stroke="currentColor" stroke-width="1.8"/>
                 </svg>
               </a>
+              <div id="batch-separate-files" class="batch-separate-files" hidden>
+                <p class="batch-files-title">Archivos individuales listos para descargar:</p>
+                <div id="batch-files-list" class="batch-files-list"></div>
+              </div>
               <a class="download-button secondary" id="download-zip-link" href="#" download>
                 <span class="download-zip-label">Descargar piezas sueltas (ZIP)</span>
                 <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -320,7 +336,7 @@
 
     <footer class="site-footer">
       <div class="footer-info">
-        <p>PosterMaker · todo se procesa en tu equipo de forma privada. <span class="version-badge">v0.2.0</span> · <button type="button" id="btn-check-update" class="btn-text">Buscar actualizaciones</button></p>
+        <p>PosterMaker · todo se procesa en tu equipo de forma privada. <span class="version-badge">v0.2.1</span> · <button type="button" id="btn-check-update" class="btn-text">Buscar actualizaciones</button></p>
         <p class="footer-hint">El servidor se apaga automáticamente tras un periodo de inactividad para ahorrar memoria.</p>
       </div>
       <button type="button" id="btn-shutdown" class="btn-subtle" title="Cerrar servidor y liberar memoria RAM inmediatamente">
