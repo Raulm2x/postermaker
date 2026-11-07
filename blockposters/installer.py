@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .updater import _find_git_dir
+
 
 def _resolve_paths() -> dict[str, Path]:
     is_root = os.geteuid() == 0 if hasattr(os, "geteuid") else False
@@ -163,6 +165,18 @@ def install_desktop() -> int:
         systemd_dir = paths["apps"].parent / "systemd/user" if "apps" in paths else Path.home() / ".config/systemd/user"
     systemd_dir.mkdir(parents=True, exist_ok=True)
     dest_service = systemd_dir / "postermaker.service"
+
+    git_root = _find_git_dir()
+    if git_root:
+        for app_name in ("postermaker", "blockposters"):
+            try:
+                cfg_dir = Path.home() / f".config/{app_name}"
+                cfg_dir.mkdir(parents=True, exist_ok=True)
+                (cfg_dir / "repo_path").write_text(str(git_root), encoding="utf-8")
+            except (OSError, Exception):
+                pass
+
+    env_line = f'Environment="POSTERMAKER_REPO_DIR={git_root}"\n' if git_root else ""
     service_content = (
         "[Unit]\n"
         "Description=Servidor local de PosterMaker\n"
@@ -170,6 +184,7 @@ def install_desktop() -> int:
         "After=network.target\n\n"
         "[Service]\n"
         "Type=simple\n"
+        f"{env_line}"
         f'ExecStart="{dest_bin}" --server --host 127.0.0.1 --port 8000 --idle-timeout 900\n'
         "Restart=no\n"
         "Slice=app.slice\n"
