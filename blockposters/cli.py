@@ -15,9 +15,9 @@ from .pipeline import generate_poster
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="blockposters",
+        prog="postermaker",
         description=(
-            "Convierte una imagen en un póster imprimible dividido en varias hojas."
+            "PosterMaker: Convierte una imagen en un póster imprimible dividido en varias hojas."
         ),
     )
     parser.add_argument("image", nargs="?", help="Imagen de entrada (JPG, PNG o WebP).")
@@ -92,8 +92,17 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--guide",
+        dest="guide",
         action="store_true",
+        default=False,
         help="Incluir hoja con plano de montaje e instrucciones.",
+    )
+    parser.add_argument(
+        "--skip-guide",
+        "--no-guide",
+        dest="guide",
+        action="store_false",
+        help="Omitir la hoja con plano de montaje e instrucciones (predeterminado).",
     )
     parser.add_argument(
         "--tiles",
@@ -186,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
     import tempfile
     temp_tiles_ctx = None
     if zip_path and not tiles:
-        temp_tiles_ctx = tempfile.TemporaryDirectory(prefix="blockposters-cli-zip-")
+        temp_tiles_ctx = tempfile.TemporaryDirectory(prefix="postermaker-cli-zip-")
         effective_tiles_dir = Path(temp_tiles_ctx.name)
     else:
         effective_tiles_dir = tiles

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from pypdf import PdfReader
 
 from postermaker import web
 
@@ -191,3 +192,51 @@ def test_updater_endpoints(client, monkeypatch: pytest.MonkeyPatch) -> None:
     chk_resp = client.post("/api/update/check")
     assert chk_resp.status_code == 200
     assert chk_resp.get_json()["status"] == "up_to_date"
+
+
+def test_generate_skip_guide_by_default(client) -> None:
+    # Por defecto la opción en la web viene marcada como skip_guide="true"
+    response = client.post(
+        "/api/generate",
+        data={
+            "image": (image_bytes(800, 600), "foto.jpg"),
+            "pages_wide": "2",
+            "paper": "a4",
+            "orientation": "portrait",
+            "skip_guide": "true",
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    expected_pages = payload["pagesWide"] * payload["pagesHigh"]
+
+    pdf_resp = client.get(payload["downloadUrl"])
+    assert pdf_resp.status_code == 200
+    reader = PdfReader(io.BytesIO(pdf_resp.data))
+    # No debe incluir la primera página de guía
+    assert len(reader.pages) == expected_pages
+
+
+def test_generate_with_assembly_guide_when_unskipped(client) -> None:
+    # Cuando el usuario desmarca "Omitir plano de montaje", skip_guide="false"
+    response = client.post(
+        "/api/generate",
+        data={
+            "image": (image_bytes(800, 600), "foto.jpg"),
+            "pages_wide": "2",
+            "paper": "a4",
+            "orientation": "portrait",
+            "skip_guide": "false",
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    expected_pages = payload["pagesWide"] * payload["pagesHigh"] + 1
+
+    pdf_resp = client.get(payload["downloadUrl"])
+    assert pdf_resp.status_code == 200
+    reader = PdfReader(io.BytesIO(pdf_resp.data))
+    # Debe incluir 1 página extra de plano de montaje al inicio
+    assert len(reader.pages) == expected_pages

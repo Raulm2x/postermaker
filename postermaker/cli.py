@@ -92,8 +92,17 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--guide",
+        dest="guide",
         action="store_true",
+        default=False,
         help="Incluir hoja con plano de montaje e instrucciones.",
+    )
+    parser.add_argument(
+        "--skip-guide",
+        "--no-guide",
+        dest="guide",
+        action="store_false",
+        help="Omitir la hoja con plano de montaje e instrucciones (predeterminado).",
     )
     parser.add_argument(
         "--tiles",

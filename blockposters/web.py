@@ -196,7 +196,12 @@ def _parse_options(form):
     dpi = _parse_int(form, "dpi", 300, 72, 600, "La resolución")
     marks = _parse_bool(form, "marks")
     labels = _parse_bool(form, "labels")
-    guide = _parse_bool(form, "guide") or _parse_bool(form, "assembly_guide")
+    if "skip_guide" in form or "skip-guide" in form:
+        guide = not (_parse_bool(form, "skip_guide") or _parse_bool(form, "skip-guide"))
+    elif "guide" in form or "assembly_guide" in form:
+        guide = _parse_bool(form, "guide") or _parse_bool(form, "assembly_guide")
+    else:
+        guide = False
     color = str(form.get("color", form.get("color_mode", "color"))).strip().lower()
     if color not in ("color", "grayscale", "monochrome"):
         color = "color"

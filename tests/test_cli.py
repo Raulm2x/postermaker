@@ -49,6 +49,32 @@ def test_cli_poster_with_options(tmp_path: Path) -> None:
         assert len(names) >= 4
 
 
+def test_cli_guide_and_skip_guide(tmp_path: Path) -> None:
+    from pypdf import PdfReader
+
+    src = make_test_image(tmp_path / "src.jpg")
+    out_default = tmp_path / "out_default.pdf"
+    out_with_guide = tmp_path / "out_with_guide.pdf"
+    out_skip_guide = tmp_path / "out_skip_guide.pdf"
+
+    # 1. Por defecto no incluye guía
+    code = main([str(src), "-o", str(out_default), "--pages-high", "1"])
+    assert code == 0
+    pages_default = len(PdfReader(str(out_default)).pages)
+
+    # 2. Con --guide incluye la página de guía (+1)
+    code = main([str(src), "-o", str(out_with_guide), "--pages-high", "1", "--guide"])
+    assert code == 0
+    pages_guide = len(PdfReader(str(out_with_guide)).pages)
+    assert pages_guide == pages_default + 1
+
+    # 3. Con --skip-guide explícitamente no incluye la guía
+    code = main([str(src), "-o", str(out_skip_guide), "--pages-high", "1", "--skip-guide"])
+    assert code == 0
+    pages_skip = len(PdfReader(str(out_skip_guide)).pages)
+    assert pages_skip == pages_default
+
+
 def test_main_entrypoint_routing(monkeypatch: pytest.MonkeyPatch) -> None:
     from postermaker import __main__ as bp_main
 

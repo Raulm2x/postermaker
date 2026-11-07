@@ -38,6 +38,7 @@ const els = {
   marks: document.getElementById("marks"),
   labels: document.getElementById("labels"),
   guide: document.getElementById("guide"),
+  skipGuide: document.getElementById("skip-guide"),
   dimensions: document.getElementById("dimensions"),
   summaryDetail: document.getElementById("summary-detail"),
   dpiBadge: document.getElementById("dpi-badge"),
@@ -84,9 +85,10 @@ function readOptions() {
     margin: Number(els.margin.value),
     overlap: Number(els.overlap.value),
     dpi: Number(els.dpi.value),
-    marks: els.marks.checked,
-    labels: els.labels.checked,
-    guide: Boolean(els.guide && els.guide.checked),
+    marks: Boolean(els.marks && els.marks.checked),
+    labels: Boolean(els.labels && els.labels.checked),
+    guide: Boolean(els.skipGuide ? !els.skipGuide.checked : (els.guide && els.guide.checked)),
+    skipGuide: Boolean(els.skipGuide ? els.skipGuide.checked : (els.guide ? !els.guide.checked : true)),
   };
 }
 
@@ -206,9 +208,10 @@ function updateSummary(options, grid) {
   const lastRowHeight =
     grid.posterHeight - (grid.pagesHigh - 1) * grid.usableHeight;
   const partialRow = lastRowHeight < grid.usableHeight - 0.5;
+  const totalPages = grid.totalPages + (options.guide ? 1 : 0);
   els.summaryDetail.textContent =
     `${grid.pagesWide} × ${grid.pagesHigh} hojas · ` +
-    `${grid.totalPages} página${grid.totalPages === 1 ? "" : "s"} · ` +
+    `${totalPages} página${totalPages === 1 ? "" : "s"} · ` +
     `${(PAPERS[options.paper] || PAPERS.letter).name} ${orientationText}` +
     (partialRow ? " · última fila parcial" : "");
 
@@ -558,6 +561,7 @@ async function generate() {
   formData.append("marks", options.marks ? "true" : "false");
   formData.append("labels", options.labels ? "true" : "false");
   formData.append("guide", options.guide ? "true" : "false");
+  formData.append("skip_guide", options.skipGuide ? "true" : "false");
 
   setGenerating(true);
   setStatus("Generando el PDF. Las imágenes grandes pueden tardar unos segundos…");
@@ -659,6 +663,7 @@ for (const element of [
   els.marks,
   els.labels,
   els.guide,
+  els.skipGuide,
 ]) {
   if (element) {
     element.addEventListener("input", onOptionsChanged);
