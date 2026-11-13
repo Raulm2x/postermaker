@@ -401,3 +401,12 @@ def test_generate_batch_separate_option(client) -> None:
     assert single_resp.data.startswith(b"%PDF")
     reader = PdfReader(io.BytesIO(single_resp.data))
     assert len(reader.pages) == 1
+
+
+def test_web_main_module_executable(monkeypatch: pytest.MonkeyPatch) -> None:
+    import runpy
+    called = []
+    monkeypatch.setattr(web, "main", lambda argv=None: called.append(argv) or 0)
+    runpy.run_module("postermaker.web", run_name="__main__")
+    assert len(called) == 1
+

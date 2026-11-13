@@ -1,0 +1,25 @@
+:root {
+  --paper: #f3ecdf;
+  --paper-deep: #e9dfcd;
+  --surface: #fffdf8;
+  --surface-soft: #faf5ec;
+  --ink: #17211f;
+  --ink-soft: #39433f;
+  --muted: #737a72;
+  --line: #ded4c2;
+  --line-strong: #cbbfa9;
+  --accent: #e4572e;
+  --accent-dark: #b93f1c;
+  --accent-soft: #fbe7df;
+  --green: #2f6b4f;
+  --green-soft: #e6f0e9;
+  --amber: #9a6a18;
+  --amber-soft: #fbf0d9;
+  --red: #a63a31;
+  --red-soft: #f9e7e4;
+  --shadow: 0 18px 50px -28px rgba(35, 31, 22, 0.45);
+  --radius: 18px;
+  --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

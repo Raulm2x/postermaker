@@ -28,8 +28,6 @@ elif [ -f "$PARENT_DIR/dist/postermaker" ]; then
     SRC_BIN="$PARENT_DIR/dist/postermaker"
 elif [ -f "$PARENT_DIR/postermaker" ]; then
     SRC_BIN="$PARENT_DIR/postermaker"
-elif [ -f "$PARENT_DIR/dist/blockposters" ]; then
-    SRC_BIN="$PARENT_DIR/dist/blockposters"
 fi
 
 # Buscar el icono SVG
@@ -40,8 +38,6 @@ elif [ -f "$PARENT_DIR/postermaker.svg" ]; then
     SRC_ICON="$PARENT_DIR/postermaker.svg"
 elif [ -f "$PARENT_DIR/postermaker/static/favicon.svg" ]; then
     SRC_ICON="$PARENT_DIR/postermaker/static/favicon.svg"
-elif [ -f "$PARENT_DIR/blockposters.svg" ]; then
-    SRC_ICON="$PARENT_DIR/blockposters.svg"
 fi
 
 # Crear directorios de destino
@@ -106,9 +102,8 @@ if [ "$(id -u)" -eq 0 ]; then
     SYSTEMD_USER_DIR="/etc/systemd/user"
 else
     SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
-    mkdir -p "$HOME/.config/postermaker" "$HOME/.config/blockposters"
+    mkdir -p "$HOME/.config/postermaker"
     echo "$PARENT_DIR" > "$HOME/.config/postermaker/repo_path" 2>/dev/null || true
-    echo "$PARENT_DIR" > "$HOME/.config/blockposters/repo_path" 2>/dev/null || true
 fi
 mkdir -p "$SYSTEMD_USER_DIR"
 DEST_SERVICE="$SYSTEMD_USER_DIR/postermaker.service"
