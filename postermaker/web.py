@@ -277,7 +277,7 @@ def api_shutdown():
         inactivity_manager.shutdown(reason="Solicitud manual desde la interfaz")
 
     threading.Thread(target=_do_shutdown, daemon=True).start()
-    return jsonify(ok=True, message="Servidor apagado y recursos liberados con éxito.")
+    return jsonify(ok=True, message="Servidor de PosterMaker cerrado correctamente.")
 
 
 @app.get("/api/update/status")

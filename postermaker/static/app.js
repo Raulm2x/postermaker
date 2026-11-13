@@ -19,6 +19,7 @@ const MM_PER_INCH = 25.4;
 const els = {
   dropzone: document.getElementById("dropzone"),
   fileInput: document.getElementById("file-input"),
+  fileAddInput: document.getElementById("file-add-input"),
   changeImage: document.getElementById("change-image"),
   previewStage: document.getElementById("preview-stage"),
   batchBar: document.getElementById("batch-bar"),
@@ -83,6 +84,9 @@ function readOptions() {
   const dimMode = document.querySelector('input[name="dimension_mode"]:checked')?.value || "wide";
   const dimCount = Number(els.pagesWide.value);
   const colorMode = document.querySelector('input[name="color_mode"]:checked')?.value || "color";
+  const guideChecked = Boolean(
+    els.guide ? els.guide.checked : (els.skipGuide ? !els.skipGuide.checked : false)
+  );
 
   return {
     dimMode,
@@ -97,8 +101,8 @@ function readOptions() {
     dpi: Number(els.dpi.value),
     marks: Boolean(els.marks && els.marks.checked),
     labels: Boolean(els.labels && els.labels.checked),
-    guide: Boolean(els.skipGuide ? !els.skipGuide.checked : (els.guide && els.guide.checked)),
-    skipGuide: Boolean(els.skipGuide ? els.skipGuide.checked : (els.guide ? !els.guide.checked : true)),
+    guide: guideChecked,
+    skipGuide: !guideChecked,
     separatePosters: Boolean(els.separatePosters && els.separatePosters.checked),
   };
 }
@@ -173,9 +177,11 @@ function clearResult() {
 }
 
 function updateCalibrationLink(paper) {
+  if (!els.calibrationLink) return;
   const info = PAPERS[paper] || PAPERS.letter;
   els.calibrationLink.href = `/api/calibration?paper=${encodeURIComponent(paper)}`;
-  els.calibrationLink.textContent = `Descargar calibración ${info.name}`;
+  els.calibrationLink.title = `Descargar hoja de calibración para ${info.name}`;
+  els.calibrationLink.textContent = `Calibrar (${info.name})`;
 }
 
 function updateLabels(options) {
@@ -465,31 +471,79 @@ function selectActiveImage(index) {
   updateAll();
 }
 
+function removeImage(idx) {
+  if (!state.items || !state.items[idx]) return;
+  if (state.items[idx].objectUrl) {
+    URL.revokeObjectURL(state.items[idx].objectUrl);
+  }
+  state.items.splice(idx, 1);
+  state.files = state.items.map((it) => it.file);
+
+  if (state.items.length === 0) {
+    resetPoster();
+    return;
+  }
+
+  if (state.activeIndex >= state.items.length) {
+    state.activeIndex = state.items.length - 1;
+  }
+  selectActiveImage(state.activeIndex);
+  renderBatchThumbs();
+  clearResult();
+  updateAll();
+}
+
 function renderBatchThumbs() {
   if (!els.batchBar || !els.batchThumbs) return;
-  if (!state.items || state.items.length <= 1) {
+  if (!state.items || state.items.length === 0) {
     els.batchBar.hidden = true;
     return;
   }
 
   els.batchBar.hidden = false;
-  if (els.batchCount) els.batchCount.textContent = `${state.items.length} imágenes`;
+  const count = state.items.length;
+  if (els.batchCount) {
+    els.batchCount.textContent = `${count} ${count === 1 ? "imagen" : "imágenes"}`;
+  }
   els.batchThumbs.innerHTML = "";
 
   state.items.forEach((item, idx) => {
-    const thumb = document.createElement("button");
-    thumb.type = "button";
+    const thumb = document.createElement("div");
     thumb.className = `batch-thumb-item ${idx === state.activeIndex ? "is-active" : ""}`;
     thumb.title = `${idx + 1}. ${item.file.name}`;
     thumb.innerHTML = `
       <span class="batch-thumb-num">${idx + 1}</span>
       <img src="${item.objectUrl}" alt="${item.file.name}" />
+      <button type="button" class="batch-thumb-remove" title="Quitar de la lista" aria-label="Quitar">&times;</button>
     `;
-    thumb.addEventListener("click", () => {
+    thumb.addEventListener("click", (e) => {
+      if (e.target.closest(".batch-thumb-remove")) {
+        e.preventDefault();
+        e.stopPropagation();
+        removeImage(idx);
+        return;
+      }
       selectActiveImage(idx);
     });
     els.batchThumbs.appendChild(thumb);
   });
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "batch-thumb-add";
+  addBtn.title = "Añadir más imágenes";
+  addBtn.innerHTML = `
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M8 3v10M3 8h10"/>
+    </svg>
+    <span>Añadir</span>
+  `;
+  addBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (els.fileAddInput) els.fileAddInput.click();
+  });
+  els.batchThumbs.appendChild(addBtn);
 }
 
 function showImage(file, image, objectUrl) {
@@ -507,7 +561,7 @@ function showImage(file, image, objectUrl) {
   els.dropzone.hidden = true;
   els.previewStage.hidden = false;
   if (els.batchBar) els.batchBar.hidden = true;
-  els.changeImage.hidden = false;
+  if (els.changeImage) els.changeImage.hidden = false;
   clearResult();
   setStatus("");
   updateAll();
@@ -531,12 +585,13 @@ function resetPoster() {
   state.generating = false;
   state.invalid = false;
 
-  els.fileInput.value = "";
+  if (els.fileInput) els.fileInput.value = "";
+  if (els.fileAddInput) els.fileAddInput.value = "";
   els.dropzone.hidden = false;
   els.previewStage.hidden = true;
   if (els.batchBar) els.batchBar.hidden = true;
   if (els.batchThumbs) els.batchThumbs.innerHTML = "";
-  els.changeImage.hidden = true;
+  if (els.changeImage) els.changeImage.hidden = true;
   els.generate.classList.remove("loading");
   els.generate.removeAttribute("aria-busy");
   els.generate.querySelector(".button-label").textContent = "Crear PDF";
@@ -545,7 +600,7 @@ function resetPoster() {
   updateAll();
 }
 
-function loadFiles(fileList) {
+function loadFiles(fileList, append = false) {
   if (!fileList || !fileList.length) return;
   const files = Array.from(fileList);
 
@@ -567,17 +622,21 @@ function loadFiles(fileList) {
 
   if (!validFiles.length) return;
 
-  if (state.items) {
-    for (const item of state.items) {
-      if (item && item.objectUrl) URL.revokeObjectURL(item.objectUrl);
+  if (!append) {
+    if (state.items) {
+      for (const item of state.items) {
+        if (item && item.objectUrl) URL.revokeObjectURL(item.objectUrl);
+      }
     }
+    if (state.imageUrl) {
+      URL.revokeObjectURL(state.imageUrl);
+    }
+    state.items = [];
+    state.files = [];
   }
-  if (state.imageUrl) {
-    URL.revokeObjectURL(state.imageUrl);
-  }
-  state.items = new Array(validFiles.length);
-  state.files = validFiles;
 
+  const startIndex = state.items.length;
+  const newItems = new Array(validFiles.length);
   let loadedCount = 0;
   const total = validFiles.length;
 
@@ -585,35 +644,49 @@ function loadFiles(fileList) {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      state.items[index] = { file, image: img, objectUrl };
+      newItems[index] = { file, image: img, objectUrl };
       loadedCount += 1;
       if (loadedCount === total) {
-        onAllImagesLoaded();
+        onNewImagesLoaded(newItems, append, startIndex);
       }
     };
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
       loadedCount += 1;
       if (loadedCount === total) {
-        onAllImagesLoaded();
+        onNewImagesLoaded(newItems, append, startIndex);
       }
     };
     img.src = objectUrl;
   });
 }
 
-function onAllImagesLoaded() {
-  state.items = state.items.filter(Boolean);
-  if (!state.items.length) {
-    setStatus("No se pudieron cargar las imágenes seleccionadas.", "error");
+function onNewImagesLoaded(newItems, append, startIndex) {
+  const filtered = newItems.filter(Boolean);
+  if (!filtered.length) {
+    if (!state.items.length) {
+      setStatus("No se pudieron cargar las imágenes seleccionadas.", "error");
+    }
     return;
   }
+
+  if (append) {
+    state.items = state.items.concat(filtered);
+  } else {
+    state.items = filtered;
+  }
   state.files = state.items.map((it) => it.file);
-  selectActiveImage(0);
+
+  const targetIndex = append ? startIndex : 0;
+  state.activeIndex = targetIndex;
+  state.file = state.items[targetIndex].file;
+  state.image = state.items[targetIndex].image;
+  state.imageUrl = state.items[targetIndex].objectUrl;
+  state.invalid = false;
 
   els.dropzone.hidden = true;
   els.previewStage.hidden = false;
-  els.changeImage.hidden = false;
+  if (els.changeImage) els.changeImage.hidden = false;
 
   renderBatchThumbs();
   clearResult();
@@ -804,7 +877,7 @@ async function generate() {
 /* ---------- Eventos ---------- */
 
 els.dropzone.addEventListener("click", (event) => {
-  if (event.target === els.fileInput) return;
+  if (event.target === els.fileInput || event.target === els.fileAddInput) return;
   els.fileInput.click();
 });
 els.dropzone.addEventListener("keydown", (event) => {
@@ -814,12 +887,54 @@ els.dropzone.addEventListener("keydown", (event) => {
   }
 });
 
-els.fileInput.addEventListener("change", () => {
-  const files = els.fileInput.files;
-  if (files && files.length) loadFiles(files);
-});
+if (els.fileInput) {
+  els.fileInput.addEventListener("click", (e) => e.stopPropagation());
+  els.fileInput.addEventListener("change", () => {
+    const files = els.fileInput.files;
+    if (files && files.length) loadFiles(files, false);
+    els.fileInput.value = "";
+  });
+}
 
-els.changeImage.addEventListener("click", () => els.fileInput.click());
+if (els.fileAddInput) {
+  els.fileAddInput.addEventListener("click", (e) => e.stopPropagation());
+  els.fileAddInput.addEventListener("change", () => {
+    const files = els.fileAddInput.files;
+    if (files && files.length) loadFiles(files, true);
+    els.fileAddInput.value = "";
+  });
+}
+
+if (els.changeImage) {
+  els.changeImage.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (els.fileInput) els.fileInput.click();
+  });
+}
+
+if (els.canvasWrap) {
+  for (const eventName of ["dragenter", "dragover"]) {
+    els.canvasWrap.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      els.canvasWrap.classList.add("is-dragging");
+    });
+  }
+
+  for (const eventName of ["dragleave", "dragend"]) {
+    els.canvasWrap.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      els.canvasWrap.classList.remove("is-dragging");
+    });
+  }
+
+  els.canvasWrap.addEventListener("drop", (event) => {
+    event.preventDefault();
+    els.canvasWrap.classList.remove("is-dragging");
+    const files = event.dataTransfer && event.dataTransfer.files;
+    if (files && files.length) loadFiles(files, true);
+  });
+}
 
 for (const eventName of ["dragenter", "dragover"]) {
   els.dropzone.addEventListener(eventName, (event) => {
@@ -953,17 +1068,17 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
-// Botón de apagado manual y liberación de memoria
+// Botón de apagado manual
 const shutdownBtn = document.getElementById("btn-shutdown");
 if (shutdownBtn) {
   shutdownBtn.addEventListener("click", async () => {
     const confirmShutdown = window.confirm(
-      "¿Deseas cerrar el servidor local de PosterMaker y liberar memoria del sistema?\n\nPodrás volver a abrirlo en cualquier momento desde tu menú de aplicaciones."
+      "¿Deseas salir de PosterMaker y cerrar la aplicación?"
     );
     if (!confirmShutdown) return;
 
     shutdownBtn.disabled = true;
-    shutdownBtn.textContent = "Liberando recursos...";
+    shutdownBtn.textContent = "Cerrando...";
 
     try {
       await fetch("/api/shutdown", { method: "POST" });
@@ -973,14 +1088,10 @@ if (shutdownBtn) {
 
     document.body.innerHTML = `
       <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 24px; background: #fffdf8; color: #17211f;">
-        <div style="max-width: 480px; background: #ffffff; border: 1px solid rgba(23,33,31,0.12); border-radius: 14px; padding: 36px 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
-          <div style="font-size: 2.2rem; margin-bottom: 12px;">✅</div>
-          <h1 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 10px; color: #17211f;">Recursos del sistema liberados</h1>
-          <p style="font-size: 0.95rem; color: #526360; line-height: 1.55; margin-bottom: 22px;">
-            El servidor de PosterMaker se ha cerrado correctamente y toda la memoria RAM y archivos temporales han sido liberados.
-          </p>
-          <p style="font-size: 0.85rem; color: #879995; margin: 0;">
-            Ya puedes cerrar esta pestaña. Para volver a usar PosterMaker, abre <strong>PosterMaker</strong> desde tu lanzador de aplicaciones.
+        <div style="max-width: 440px; background: #ffffff; border: 1px solid rgba(23,33,31,0.12); border-radius: 14px; padding: 36px 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
+          <h1 style="font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; color: #17211f;">PosterMaker se ha cerrado</h1>
+          <p style="font-size: 0.95rem; color: #526360; line-height: 1.5; margin: 0;">
+            Ya puedes cerrar esta pestaña. Para volver a usar la aplicación, iníciala desde tu lanzador de programas.
           </p>
         </div>
       </div>
@@ -1033,20 +1144,13 @@ async function triggerUpdateApply(targetVersion) {
 }
 
 async function handleStartupUpdateCheck() {
-  if (!updaterUi.overlay) return;
-
-  const hideOverlay = (delay = 350) => {
-    setTimeout(() => {
-      updaterUi.overlay.classList.add("is-hidden");
-    }, delay);
-  };
-
   try {
     const res = await fetch("/api/update/status");
     if (!res.ok) throw new Error("Status failed");
     const state = await res.json();
 
-    if (state.status === "updating") {
+    if (state.status === "updating" && updaterUi.overlay) {
+      updaterUi.overlay.classList.remove("is-hidden");
       updaterUi.title.textContent = "Actualizando PosterMaker...";
       updaterUi.desc.textContent = state.message || "Descargando e integrando cambios...";
       updaterUi.status.textContent = "Aplicando actualización...";
@@ -1062,23 +1166,16 @@ async function handleStartupUpdateCheck() {
             updaterUi.title.textContent = "¡Actualización completada!";
             updaterUi.desc.textContent = "PosterMaker está listo con la última versión.";
             updaterUi.status.textContent = "Iniciando...";
-            hideOverlay(600);
             setTimeout(() => window.location.reload(), 1000);
           } else if (pollState.status === "up_to_date" || pollState.status === "error" || attempts > 20) {
             clearInterval(poll);
-            hideOverlay(250);
+            if (updaterUi.overlay) updaterUi.overlay.classList.add("is-hidden");
           }
         } catch (_) {
           clearInterval(poll);
-          hideOverlay(250);
+          if (updaterUi.overlay) updaterUi.overlay.classList.add("is-hidden");
         }
       }, 700);
-      return;
-    } else if (state.status === "updated") {
-      updaterUi.title.textContent = "¡PosterMaker actualizado!";
-      updaterUi.desc.textContent = state.message;
-      updaterUi.status.textContent = "Listo para usar.";
-      hideOverlay(500);
       return;
     } else if (state.status === "available" || state.has_update) {
       if (updaterUi.btnCheck) {
@@ -1087,10 +1184,8 @@ async function handleStartupUpdateCheck() {
         updaterUi.btnCheck.style.color = "#e4572e";
       }
     }
-
-    hideOverlay(250);
   } catch (e) {
-    hideOverlay(150);
+    // Silencioso en modo local / sin conexión
   }
 }
 
