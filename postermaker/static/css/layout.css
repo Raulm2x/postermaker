@@ -61,19 +61,6 @@
   letter-spacing: -0.02em;
 }
 
-.brand-text .version-tag {
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
-  padding: 2px 7px;
-  border-radius: 6px;
-  margin-left: 2px;
-}
-
 .header-actions {
   display: flex;
   align-items: center;
