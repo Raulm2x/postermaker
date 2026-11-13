@@ -1,0 +1,66 @@
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1020px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .options-panel {
+    position: static;
+  }
+
+  .dropzone {
+    min-height: 340px;
+  }
+}
+
+@media (max-width: 680px) {
+  .page {
+    width: min(100% - 28px, 1220px);
+    padding-top: 18px;
+  }
+
+  .site-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .preview-panel,
+  .options-panel {
+    padding: 18px;
+    border-radius: 15px;
+  }
+
+  .preview-panel .panel-head {
+    margin-bottom: 14px;
+  }
+
+  .dropzone {
+    min-height: 280px;
+    padding: 22px;
+  }
+
+  .canvas-wrap {
+    height: clamp(280px, 45vh, 420px);
+    min-height: 260px;
+    padding: 14px;
+  }
+
+  .preview-meta {
+    height: auto;
+    min-height: auto;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .site-footer {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .control-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,9 +1,0 @@
-[Unit]
-Description=Socket local de Block Posters
-PartOf=blockposters.service
-
-[Socket]
-ListenStream=127.0.0.1:8000
-
-[Install]
-WantedBy=sockets.target

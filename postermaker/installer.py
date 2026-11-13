@@ -43,10 +43,8 @@ def _get_icon_bytes() -> bytes:
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         for cand in (
             Path(sys._MEIPASS) / "postermaker/static/favicon.svg",
-            Path(sys._MEIPASS) / "blockposters/static/favicon.svg",
             Path(sys._MEIPASS) / "static/favicon.svg",
             Path(sys._MEIPASS) / "postermaker.svg",
-            Path(sys._MEIPASS) / "blockposters.svg",
         ):
             if cand.is_file():
                 return cand.read_bytes()
@@ -55,7 +53,6 @@ def _get_icon_bytes() -> bytes:
     exe_dir = Path(sys.executable).resolve().parent
     for cand in (
         exe_dir / "postermaker.svg",
-        exe_dir / "blockposters.svg",
         exe_dir / "favicon.svg",
     ):
         if cand.is_file():
@@ -65,7 +62,6 @@ def _get_icon_bytes() -> bytes:
     pkg_dir = Path(__file__).resolve().parent
     for cand in (
         pkg_dir.parent / "postermaker.svg",
-        pkg_dir.parent / "blockposters.svg",
         pkg_dir / "static/favicon.svg",
     ):
         if cand.is_file():

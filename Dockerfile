@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY pyproject.toml README.md ./
 COPY postermaker ./postermaker
-COPY blockposters ./blockposters
 
 RUN pip install --no-cache-dir .
 

@@ -33,6 +33,16 @@ def test_index_and_health(client) -> None:
     assert response.status_code == 200
     assert b"PosterMaker" in response.data
 
+    # Verificar que el UI no contenga texto de relleno/slop publicitario
+    html = response.get_data(as_text=True)
+    assert "Sin cuentas, sin marca de agua" not in html
+    assert "en tamaño mural" not in html
+    assert "Cómo funciona" not in html
+    assert "Omitir plano de montaje" not in html
+    assert 'id="guide"' in html
+    assert 'id="calibration-link"' in html
+    assert 'class="updater-overlay is-hidden"' in html
+
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.get_json() == {"ok": True}
@@ -391,3 +401,12 @@ def test_generate_batch_separate_option(client) -> None:
     assert single_resp.data.startswith(b"%PDF")
     reader = PdfReader(io.BytesIO(single_resp.data))
     assert len(reader.pages) == 1
+
+
+def test_web_main_module_executable(monkeypatch: pytest.MonkeyPatch) -> None:
+    import runpy
+    called = []
+    monkeypatch.setattr(web, "main", lambda argv=None: called.append(argv) or 0)
+    runpy.run_module("postermaker.web", run_name="__main__")
+    assert len(called) == 1
+

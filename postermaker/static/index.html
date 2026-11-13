@@ -6,21 +6,21 @@
   <title>PosterMaker · Pósteres imprimibles</title>
   <meta name="description" content="Convierte una imagen en un póster imprimible dividido en hojas Carta, A4, Oficio o Tabloide.">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/app.js" defer></script>
+  <link rel="stylesheet" href="/static/style.css?v=0.3.0">
+  <script type="module" src="/static/app.js?v=0.3.0"></script>
 </head>
 <body>
-  <div id="updater-overlay" class="updater-overlay" aria-live="polite">
+  <div id="updater-overlay" class="updater-overlay is-hidden" aria-live="polite">
     <div class="updater-card">
       <div class="updater-mark">
         <i></i><i></i><i></i><i></i>
       </div>
-      <h2 id="updater-title">Iniciando PosterMaker</h2>
-      <p id="updater-desc">Comprobando cambios en el repositorio...</p>
+      <h2 id="updater-title">Actualizando PosterMaker</h2>
+      <p id="updater-desc">Aplicando cambios...</p>
       <div class="updater-progress">
         <div id="updater-progress-bar" class="updater-progress-bar"></div>
       </div>
-      <span id="updater-status" class="updater-status">Conectando...</span>
+      <span id="updater-status" class="updater-status">Por favor espera...</span>
     </div>
   </div>
 
@@ -32,27 +32,27 @@
         </span>
         <span class="brand-text">
           <strong>PosterMaker</strong>
-          <small>local</small>
         </span>
       </a>
-      <p class="header-note">Imprime en casa. Sin cuentas, sin marca de agua.</p>
+      <div class="header-actions">
+        <button type="button" id="btn-check-update" class="btn-subtle" title="Buscar actualizaciones de PosterMaker">
+          Buscar actualizaciones
+        </button>
+        <button type="button" id="btn-shutdown" class="btn-subtle" title="Cerrar la aplicación">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M8 2v5M4.5 4.5a5.5 5.5 0 1 0 7 0"/>
+          </svg>
+          Salir
+        </button>
+      </div>
     </header>
 
     <main>
-      <section class="intro">
-        <p class="eyebrow">Póster en cuadrícula</p>
-        <h1>Tu imagen,<br><em>en tamaño mural.</em></h1>
-        <p class="lead">
-          Elige una foto, decide cuántas hojas de ancho quieres y descarga un PDF
-          listo para imprimir. Cada página es una pieza del póster.
-        </p>
-      </section>
-
       <div class="workspace">
         <section class="preview-panel" aria-labelledby="preview-title">
+          <input type="file" id="file-add-input" accept="image/jpeg,image/png,image/webp" multiple hidden>
           <div class="panel-head">
             <div>
-              <p class="panel-kicker">01 · Imagen</p>
               <h2 id="preview-title">Vista previa</h2>
             </div>
             <button type="button" class="ghost-button" id="change-image" hidden>
@@ -61,7 +61,7 @@
           </div>
 
           <div class="dropzone" id="dropzone" tabindex="0" role="button"
-               aria-label="Seleccionar una o varias imágenes JPG o PNG">
+               aria-label="Seleccionar una o varias imágenes JPG, PNG o WebP">
             <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" multiple hidden>
             <div class="dropzone-icon" aria-hidden="true">
               <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -71,18 +71,11 @@
               </svg>
             </div>
             <p class="dropzone-title">Arrastra tus imágenes aquí</p>
-            <p class="dropzone-copy">o haz clic para elegir archivos</p>
-            <span class="dropzone-meta">JPG, PNG o WebP · una o varias imágenes</span>
+            <p class="dropzone-copy">o haz clic para explorar archivos</p>
+            <span class="dropzone-meta">JPG · PNG · WebP</span>
           </div>
 
           <div class="preview-stage" id="preview-stage" hidden>
-            <div class="batch-bar" id="batch-bar" hidden>
-              <div class="batch-bar-header">
-                <span id="batch-count" class="batch-count">0 imágenes</span>
-                <span class="batch-hint">Haz clic en una miniatura para ver su póster</span>
-              </div>
-              <div class="batch-thumbs" id="batch-thumbs"></div>
-            </div>
             <div class="canvas-wrap" id="canvas-wrap">
               <canvas id="preview-canvas" aria-label="Vista previa del póster con guías de corte"></canvas>
             </div>
@@ -91,26 +84,27 @@
               <span id="hover-tile-info" class="hover-tile-info" hidden></span>
               <span class="cut-legend"><i aria-hidden="true"></i> guías de corte</span>
             </div>
+            <div class="batch-bar" id="batch-bar" hidden>
+              <div class="batch-bar-header">
+                <span id="batch-count" class="batch-count">0 imágenes</span>
+                <span class="batch-hint">Selecciona una miniatura para verla</span>
+              </div>
+              <div class="batch-thumbs" id="batch-thumbs"></div>
+            </div>
           </div>
-
-          <p class="fine-print">
-            La vista previa es orientativa. La imagen no se recorta ni se deforma:
-            si la última fila no se llena, sobra papel en blanco que puedes recortar.
-          </p>
         </section>
 
         <aside class="options-panel" aria-labelledby="options-title">
           <div class="panel-head">
             <div>
-              <p class="panel-kicker">02 · Ajustes</p>
-              <h2 id="options-title">Configura el póster</h2>
+              <h2 id="options-title">Ajustes</h2>
             </div>
           </div>
 
           <form id="options-form" novalidate>
             <div class="control">
               <div class="control-head">
-                <label for="dim-count">Tamaño del póster</label>
+                <label for="dim-count">Tamaño</label>
                 <output id="pages-wide-out" for="dim-count">3 hojas de ancho</output>
               </div>
               <div class="segmented segmented-tight" style="margin-bottom: 8px;">
@@ -136,7 +130,6 @@
                   <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6"/>
                 </svg>
               </div>
-              <p class="hint" id="dim-hint">El alto se calcula automáticamente para conservar la proporción.</p>
             </div>
 
             <div class="control-grid">
@@ -167,7 +160,7 @@
                     <option value="a3">A3 (297 × 420 mm)</option>
                     <option value="a5">A5 (148 × 210 mm)</option>
                     <option value="legal">Oficio / Legal (216 × 356 mm)</option>
-                    <option value="tabloid">Tabloide / Doble Carta (279 × 432 mm)</option>
+                    <option value="tabloid">Tabloide (279 × 432 mm)</option>
                   </select>
                   <svg class="chevron" viewBox="0 0 12 8" aria-hidden="true">
                     <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6"/>
@@ -178,7 +171,7 @@
 
             <div class="control">
               <div class="control-head">
-                <label>Modo de color</label>
+                <label>Color</label>
               </div>
               <div class="segmented">
                 <input type="radio" name="color_mode" id="color-full" value="color" checked>
@@ -188,16 +181,17 @@
                 <input type="radio" name="color_mode" id="color-mono" value="monochrome">
                 <label for="color-mono">Alto contraste</label>
               </div>
-              <p class="hint">Blanco y negro o alto contraste ahorra tinta de color o tóner en impresoras láser.</p>
             </div>
 
             <div class="control">
               <div class="control-head">
-                <label for="margin">Margen de impresión</label>
-                <output id="margin-out" for="margin">3 mm</output>
+                <label for="margin">Margen de corte</label>
+                <div class="control-head-side">
+                  <output id="margin-out" for="margin">3 mm</output>
+                  <a id="calibration-link" href="/api/calibration?paper=letter" class="control-action" download title="Descargar hoja de calibración para medir el margen de tu impresora">Calibrar</a>
+                </div>
               </div>
               <input type="range" id="margin" name="margin" min="0" max="20" step="1" value="3">
-              <p class="hint">Borde blanco por hoja que recortarás después. Usa la calibración si tu impresora no imprime hasta el borde.</p>
             </div>
 
             <div class="control">
@@ -206,7 +200,6 @@
                 <output id="overlap-out" for="overlap">0 mm</output>
               </div>
               <input type="range" id="overlap" name="overlap" min="0" max="10" step="1" value="0">
-              <p class="hint">Amplía cada pieza hacia la vecina para pegar sin costuras.</p>
             </div>
 
             <div class="control">
@@ -215,9 +208,9 @@
               </div>
               <div class="select-wrap">
                 <select id="dpi" name="dpi">
-                  <option value="150">150 ppp · borrador</option>
-                  <option value="300" selected>300 ppp · recomendado</option>
-                  <option value="600">600 ppp · máxima calidad</option>
+                  <option value="150">150 ppp</option>
+                  <option value="300" selected>300 ppp (recomendado)</option>
+                  <option value="600">600 ppp (alta resolución)</option>
                 </select>
                 <svg class="chevron" viewBox="0 0 12 8" aria-hidden="true">
                   <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6"/>
@@ -236,12 +229,12 @@
                 <span class="switch-track" aria-hidden="true"></span>
                 <span>Numerar hojas</span>
               </label>
-              <label class="switch" title="Al estar marcada, el PDF comienza directamente con las piezas a imprimir, omitiendo la primera página con la vista previa y el plano de montaje">
-                <input type="checkbox" id="skip-guide" name="skip_guide" checked>
+              <label class="switch">
+                <input type="checkbox" id="guide" name="guide">
                 <span class="switch-track" aria-hidden="true"></span>
-                <span>Omitir plano de montaje</span>
+                <span>Plano de montaje</span>
               </label>
-              <label class="switch" id="separate-wrap" title="Si seleccionas varias imágenes y activas esta opción, se generará un póster independiente para cada una en lugar de un único PDF combinado.">
+              <label class="switch" id="separate-wrap">
                 <input type="checkbox" id="separate-posters" name="separate_posters">
                 <span class="switch-track" aria-hidden="true"></span>
                 <span>Pósteres por separado</span>
@@ -299,52 +292,15 @@
                 <button type="button" id="new-poster">Crear otro</button>
               </div>
             </div>
-
-            <details class="calibration">
-              <summary>¿Qué margen debo usar?</summary>
-              <p>
-                Imprime la hoja de calibración al 100 %, mide el borde blanco de
-                tu impresora e introduce el valor mayor. Si imprime sin bordes,
-                usa 0 mm.
-              </p>
-              <a id="calibration-link" href="/api/calibration?paper=letter" download>
-                Descargar calibración Carta
-              </a>
-            </details>
           </form>
         </aside>
       </div>
-
-      <section class="steps" aria-label="Cómo funciona">
-        <article>
-          <span>01</span>
-          <h3>Elige y ajusta</h3>
-          <p>Sube una foto y define el ancho, el papel y los márgenes.</p>
-        </article>
-        <article>
-          <span>02</span>
-          <h3>Descarga el PDF</h3>
-          <p>Obtienes una página por pieza, en orden de lectura.</p>
-        </article>
-        <article>
-          <span>03</span>
-          <h3>Imprime y une</h3>
-          <p>Imprime al 100 %, recorta los bordes y pega las hojas.</p>
-        </article>
-      </section>
     </main>
 
     <footer class="site-footer">
       <div class="footer-info">
-        <p>PosterMaker · todo se procesa en tu equipo de forma privada. <span class="version-badge">v0.2.3</span> · <button type="button" id="btn-check-update" class="btn-text">Buscar actualizaciones</button></p>
-        <p class="footer-hint">El servidor se apaga automáticamente tras un periodo de inactividad para ahorrar memoria.</p>
+        <p>PosterMaker <span class="version-badge">v0.3.0</span></p>
       </div>
-      <button type="button" id="btn-shutdown" class="btn-subtle" title="Cerrar servidor y liberar memoria RAM inmediatamente">
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <path d="M8 2v5M4.5 4.5a5.5 5.5 0 1 0 7 0"/>
-        </svg>
-        Liberar memoria y salir
-      </button>
     </footer>
   </div>
 </body>

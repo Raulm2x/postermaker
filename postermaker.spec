@@ -19,6 +19,8 @@ a = Analysis(
         'werkzeug',
         'jinja2',
         'postermaker',
+        'postermaker.web',
+        'postermaker.updater',
     ],
     hookspath=[],
     hooksconfig={},
