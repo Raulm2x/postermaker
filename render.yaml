@@ -1,0 +1,24 @@
+# ==============================================================================
+# Render Blueprint Specification (render.yaml)
+# https://render.com/docs/blueprint-spec
+# ==============================================================================
+# Este archivo permite desplegar PosterMaker en Render con un solo clic
+# utilizando el Dockerfile optimizado (que incluye las fuentes del sistema
+# necesarias para el renderizado fiel de guías de corte).
+# ==============================================================================
+
+services:
+  - type: web
+    name: postermaker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: POSTERMAKER_ENV
+        value: cloud
+      - key: POSTERMAKER_LOCAL
+        value: "0"
+      - key: POSTERMAKER_OUTPUT
+        value: /tmp/postermaker

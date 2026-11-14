@@ -16,4 +16,4 @@ EXPOSE 8000
 
 ENV POSTERMAKER_OUTPUT=/tmp/postermaker
 
-CMD ["postermaker-web", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["postermaker-web", "--host", "0.0.0.0"]

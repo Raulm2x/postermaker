@@ -410,3 +410,133 @@ def test_web_main_module_executable(monkeypatch: pytest.MonkeyPatch) -> None:
     runpy.run_module("postermaker.web", run_name="__main__")
     assert len(called) == 1
 
+
+def test_environment_detection(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 1. Por defecto: local mode
+    monkeypatch.delenv("POSTERMAKER_LOCAL", raising=False)
+    monkeypatch.delenv("POSTERMAKER_CLOUD", raising=False)
+    monkeypatch.delenv("POSTERMAKER_ENV", raising=False)
+    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.delenv("FLY_APP_NAME", raising=False)
+    monkeypatch.delenv("K_SERVICE", raising=False)
+    assert web.is_local_mode() is True
+    assert web.get_app_env() == "local"
+    assert web.get_default_host() == "127.0.0.1"
+    assert web.get_default_port() == 8000
+    assert web.get_default_idle_timeout() == 900
+
+    # 2. Render inyecta RENDER=true
+    monkeypatch.setenv("RENDER", "true")
+    assert web.is_local_mode() is False
+    assert web.get_app_env() == "cloud"
+    assert web.get_default_host() == "0.0.0.0"
+    assert web.get_default_idle_timeout() == 0
+
+    # 3. RENDER=true pero override explícito con POSTERMAKER_LOCAL=1
+    monkeypatch.setenv("POSTERMAKER_LOCAL", "1")
+    assert web.is_local_mode() is True
+    assert web.get_app_env() == "local"
+
+    # 4. POSTERMAKER_LOCAL=0 fuerza cloud
+    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.setenv("POSTERMAKER_LOCAL", "0")
+    assert web.is_local_mode() is False
+
+    # 5. POSTERMAKER_CLOUD=1
+    monkeypatch.delenv("POSTERMAKER_LOCAL", raising=False)
+    monkeypatch.setenv("POSTERMAKER_CLOUD", "1")
+    assert web.is_local_mode() is False
+
+    # 6. POSTERMAKER_ENV
+    monkeypatch.delenv("POSTERMAKER_CLOUD", raising=False)
+    monkeypatch.setenv("POSTERMAKER_ENV", "cloud")
+    assert web.is_local_mode() is False
+    monkeypatch.setenv("POSTERMAKER_ENV", "production")
+    assert web.is_local_mode() is False
+    monkeypatch.setenv("POSTERMAKER_ENV", "local")
+    assert web.is_local_mode() is True
+
+    # 7. Variables personalizadas de PORT, HOST, IDLE_TIMEOUT
+    monkeypatch.setenv("PORT", "10000")
+    assert web.get_default_port() == 10000
+    monkeypatch.setenv("HOST", "0.0.0.0")
+    assert web.get_default_host() == "0.0.0.0"
+    monkeypatch.setenv("IDLE_TIMEOUT", "600")
+    assert web.get_default_idle_timeout() == 600
+
+
+def test_api_config_endpoint(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    # En modo local
+    monkeypatch.setattr(web, "is_local_mode", lambda: True)
+    monkeypatch.setattr(web, "get_app_env", lambda: "local")
+    res = client.get("/api/config")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["is_local"] is True
+    assert data["env"] == "local"
+    assert data["updates_enabled"] is True
+    assert data["shutdown_enabled"] is True
+    assert "version" in data
+
+    # En modo cloud
+    monkeypatch.setattr(web, "is_local_mode", lambda: False)
+    monkeypatch.setattr(web, "get_app_env", lambda: "cloud")
+    res2 = client.get("/api/config")
+    assert res2.status_code == 200
+    data2 = res2.get_json()
+    assert data2["is_local"] is False
+    assert data2["env"] == "cloud"
+    assert data2["updates_enabled"] is False
+    assert data2["shutdown_enabled"] is False
+
+
+def test_cloud_mode_protections(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(web, "is_local_mode", lambda: False)
+
+    # 1. Index en modo cloud inyecta data-env="cloud"
+    idx_res = client.get("/")
+    assert idx_res.status_code == 200
+    html = idx_res.get_data(as_text=True)
+    assert '<body data-env="cloud"' in html
+
+    # 2. Shutdown está bloqueado en modo nube (403 Forbidden)
+    sd_res = client.post("/api/shutdown")
+    assert sd_res.status_code == 403
+    assert "no está permitido en modo nube" in sd_res.get_json()["error"]
+
+    # 3. Comprobación de actualizaciones en modo nube
+    st_res = client.get("/api/update/status")
+    assert st_res.status_code == 200
+    assert st_res.get_json()["enabled"] is False
+
+    chk_res = client.post("/api/update/check")
+    assert chk_res.status_code == 200
+    assert chk_res.get_json()["ok"] is False
+    assert chk_res.get_json()["status"] == "disabled"
+
+    apply_res = client.post("/api/update/apply")
+    assert apply_res.status_code == 403
+
+    # 4. InactivityManager.shutdown() en modo nube es seguro (no llama a os._exit)
+    exit_called = []
+    monkeypatch.setattr("os._exit", lambda code: exit_called.append(code))
+    web.inactivity_manager.shutdown(reason="test cloud")
+    assert len(exit_called) == 0
+
+
+def test_server_main_cloud_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(web, "is_local_mode", lambda: False)
+    monkeypatch.setenv("PORT", "9999")
+
+    ran = []
+    fake_app = type("FakeApp", (), {"run": lambda self, host, port, debug: ran.append((host, port, debug))})()
+    monkeypatch.setattr(web, "app", fake_app)
+
+    code = web.main([])
+    assert code == 0
+    assert len(ran) == 1
+    host, port, _ = ran[0]
+    assert host == "0.0.0.0"
+    assert port == 9999
+
+
