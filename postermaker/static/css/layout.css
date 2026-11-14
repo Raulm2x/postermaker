@@ -67,6 +67,14 @@
   gap: 10px;
 }
 
+/* ---------- Modo Nube (Render / PaaS) ---------- */
+body[data-env="cloud"] #btn-check-update,
+body[data-env="cloud"] #btn-shutdown,
+body[data-env="cloud"] #updater-overlay,
+body[data-env="cloud"] .cloud-hidden {
+  display: none !important;
+}
+
 /* ---------- Estructura principal ---------- */
 
 .workspace {

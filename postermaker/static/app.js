@@ -198,6 +198,24 @@ window.addEventListener("resize", () => {
 
 /* ---------- Inicialización ---------- */
 
-initInactivity();
-initUpdater();
+const isCloudMode = document.body.dataset.env === "cloud";
+if (!isCloudMode) {
+  initInactivity();
+  initUpdater();
+}
+
+// Fallback asíncrono para entornos servidos estáticamente sin data-env inyectado
+fetch("/api/config")
+  .then((res) => (res.ok ? res.json() : null))
+  .then((cfg) => {
+    if (cfg && !cfg.is_local) {
+      document.body.dataset.env = "cloud";
+      const btnCheck = document.getElementById("btn-check-update");
+      const btnShut = document.getElementById("btn-shutdown");
+      if (btnCheck) btnCheck.style.display = "none";
+      if (btnShut) btnShut.style.display = "none";
+    }
+  })
+  .catch(() => {});
+
 updateAll();

@@ -13,7 +13,13 @@ import time
 import urllib.request
 
 from ..updater import updater
-from .config import get_output_dir
+from .config import (
+    get_default_host,
+    get_default_idle_timeout,
+    get_default_port,
+    get_output_dir,
+    is_local_mode,
+)
 from .inactivity import inactivity_manager
 
 
@@ -99,18 +105,36 @@ def main(argv: list[str] | None = None) -> int:
     is_running_fn = getattr(mod, "_is_postermaker_running", _is_postermaker_running)
     find_port_fn = getattr(mod, "_find_available_port", _find_available_port)
     open_browser_fn = getattr(mod, "_open_in_browser", _open_in_browser)
+    local_fn = getattr(mod, "is_local_mode", is_local_mode)
+    local = local_fn()
     app_obj = getattr(mod, "app", None)
+
+    default_port = get_default_port()
+    if "HOST" in os.environ and os.environ["HOST"].strip():
+        default_host = os.environ["HOST"].strip()
+    elif "POSTERMAKER_HOST" in os.environ and os.environ["POSTERMAKER_HOST"].strip():
+        default_host = os.environ["POSTERMAKER_HOST"].strip()
+    else:
+        default_host = "127.0.0.1" if local else "0.0.0.0"
+
+    if "IDLE_TIMEOUT" in os.environ and os.environ["IDLE_TIMEOUT"].strip():
+        try:
+            default_timeout = max(0, int(os.environ["IDLE_TIMEOUT"].strip()))
+        except ValueError:
+            default_timeout = 900 if local else 0
+    else:
+        default_timeout = 900 if local else 0
 
     parser = argparse.ArgumentParser(
         prog="postermaker-web",
-        description="Servidor local para crear pósteres imprimibles.",
+        description="Servidor para crear pósteres imprimibles.",
     )
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default=default_host)
     parser.add_argument(
         "--port",
         type=int,
-        default=8000,
-        help="Puerto inicial de escucha (por defecto 8000; si está ocupado, prueba con los siguientes hasta encontrar uno libre).",
+        default=default_port,
+        help="Puerto inicial de escucha (por defecto 8000 en local o $PORT en cloud).",
     )
     parser.add_argument("--debug", action="store_true")
     parser.add_argument(
@@ -121,8 +145,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--idle-timeout",
         type=int,
-        default=900,
-        help="Segundos de inactividad antes de liberar memoria y cerrar el servidor (por defecto 900s / 15m; 0 para desactivar).",
+        default=default_timeout,
+        help="Segundos de inactividad antes de liberar memoria y cerrar el servidor (0 para desactivar).",
     )
     parser.add_argument(
         "--no-update",
@@ -135,54 +159,68 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     inactivity_manager.timeout = args.idle_timeout
-    inactivity_manager.start()
+    if args.idle_timeout > 0:
+        inactivity_manager.start()
 
-    if not args.no_update:
+    should_check_update = (not args.no_update) and local
+    if should_check_update:
         threading.Thread(target=updater.check_and_update, daemon=True).start()
 
     target_port = args.port
 
-    # 1. Si PosterMaker ya está corriendo:
-    for p in range(target_port, min(target_port + 50, 65535 + 1)):
-        if is_running_fn(args.host, p):
-            url = f"http://{args.host}:{p}"
-            print(f"PosterMaker ya está en ejecución en: {url}")
-            if args.open:
-                open_browser_fn(url)
-            return 0
-
-    # 2. Si el puerto inicial no está libre, intentar con los siguientes:
-    free_port = find_port_fn(args.host, target_port)
-    if free_port != target_port:
-        print(f"Puerto {target_port} no disponible. Probando con los siguientes... asignado puerto {free_port}")
-        target_port = free_port
-
-    url = f"http://{args.host}:{target_port}"
-    print(f"PosterMaker local: {url}")
-
-    import atexit
-    from ..service import write_server_info, remove_server_info
-
-    write_server_info(args.host, target_port, os.getpid())
-    atexit.register(remove_server_info)
-
-    if args.open:
-        def _deferred_open():
-            deadline = time.time() + 4.0
-            opened = False
-            while time.time() < deadline:
-                if is_running_fn(args.host, target_port):
+    if local:
+        # 1. Si PosterMaker ya está corriendo:
+        for p in range(target_port, min(target_port + 50, 65535 + 1)):
+            if is_running_fn(args.host, p):
+                url = f"http://{args.host}:{p}"
+                print(f"PosterMaker ya está en ejecución en: {url}")
+                if args.open:
                     open_browser_fn(url)
-                    opened = True
-                    break
-                time.sleep(0.1)
-            if not opened:
-                open_browser_fn(url)
+                return 0
 
-        threading.Thread(target=_deferred_open, daemon=True).start()
+        # 2. Si el puerto inicial no está libre, intentar con los siguientes:
+        free_port = find_port_fn(args.host, target_port)
+        if free_port != target_port:
+            print(f"Puerto {target_port} no disponible. Probando con los siguientes... asignado puerto {free_port}")
+            target_port = free_port
+
+        url = f"http://{args.host}:{target_port}"
+        print(f"PosterMaker local: {url}")
+
+        import atexit
+        from ..service import write_server_info, remove_server_info
+
+        try:
+            write_server_info(args.host, target_port, os.getpid())
+            atexit.register(remove_server_info)
+        except Exception:
+            pass
+
+        if args.open:
+            def _deferred_open():
+                deadline = time.time() + 4.0
+                opened = False
+                while time.time() < deadline:
+                    if is_running_fn(args.host, target_port):
+                        open_browser_fn(url)
+                        opened = True
+                        break
+                    time.sleep(0.1)
+                if not opened:
+                    open_browser_fn(url)
+
+            threading.Thread(target=_deferred_open, daemon=True).start()
+    else:
+        url = f"http://{args.host}:{target_port}"
+        print(f"PosterMaker en la nube escuchando en: {url}")
 
     try:
         app_obj.run(host=args.host, port=target_port, debug=args.debug)
     finally:
-        remove_server_info()
+        if local:
+            try:
+                from ..service import remove_server_info
+                remove_server_info()
+            except Exception:
+                pass
     return 0

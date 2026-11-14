@@ -7,7 +7,16 @@ import shutil
 import threading
 import time
 
-from .config import get_output_dir
+from .config import get_output_dir, is_local_mode
+
+
+def _is_local() -> bool:
+    """Permite acceder dinámicamente a is_local_mode si se monkeypatchea en postermaker.web."""
+    import sys
+    web_mod = sys.modules.get("postermaker.web")
+    if web_mod and hasattr(web_mod, "is_local_mode"):
+        return bool(getattr(web_mod, "is_local_mode")())
+    return is_local_mode()
 
 
 class InactivityManager:
@@ -44,6 +53,10 @@ class InactivityManager:
             self.last_activity = time.time()
 
     def shutdown(self, reason: str = "Inactividad") -> None:
+        if not _is_local():
+            print(f"Apagado ignorado: PosterMaker se ejecuta en modo nube ({reason}).")
+            return
+
         print(f"Liberando recursos del sistema ({reason})...")
         try:
             output_dir = get_output_dir()
